@@ -1,0 +1,35 @@
+{
+    "language" : "PYTHON",
+    "main-file" : "rnnlm",
+    "experiment-name" : "rnnlm-1",
+    "variables" : {
+	"num_n_best": {
+	    "type" : "INT",
+	    "size" : 1,
+	    "min"  : 0,
+	    "max"  : 10
+	},
+	"hidden_layer_size" : {
+	    "type" : "INT",
+	    "size" : 1,
+	    "min"  : 0,
+	    "max"  : 7
+	},
+	"num_hidden_layers" : {
+	    "type" : "INT",
+	    "size" : 1,
+	    "min"  : 0,
+	    "max"  : 2
+	}
+    },
+    "tasks" : {
+	"rescore_wer": {
+	    "type": "OBJECTIVE",
+	    "likelihood": "NOISELESS"
+	},
+	"thresholded_rtf" : {
+	    "type": "CONSTRAINT",
+	    "likelihood" : "NOISELESS"
+	}
+    }
+}
