@@ -1,0 +1,64 @@
+{
+    "language" : "PYTHON",
+    "main-file": "dnn_train",
+    "experiment-name": "wsj-constrained-am",
+    "polling-time"    : 1,
+    "resources" : {
+        "my-machine" : {
+            "scheduler"         : "local",
+            "max-concurrent"    : 3,
+            "max-finished-jobs" : 50
+        }
+    },
+
+    "variables": {
+	"frame_size": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 9
+	},
+	"frame_shift": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 4
+	},
+	"num_mel_bins": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 9
+	},
+	"context": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 9
+	},
+	"num_layers": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 1,
+	    "max": 6
+	},
+	"hidden_layer_size": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 9
+	}
+    },
+    "tasks": {
+	"wer": {
+	    "type": "OBJECTIVE",
+	    "likelihood": "NOISELESS",
+	    "resources" : ["my-machine"]
+	},
+	"rtf_constraint": {
+	    "type": "CONSTRAINT",
+	    "likelihood": "NOISELESS",
+	    "resources" : ["my-machine"]
+	}
+    }
+}
