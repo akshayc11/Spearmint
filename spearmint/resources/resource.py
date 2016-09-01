@@ -326,6 +326,13 @@ class Resource(object):
             return False
 
         return True 
+    
+    def completedJobs(self, jobs):
+        """Has the resource completed all jobs"""
+        if self.numComplete(jobs) >= self.max_finished_jobs:
+            return True
+
+        return False
 
     def printStatus(self, jobs):
         sys.stderr.write("%-12s: %5d pending %5d complete\n" %

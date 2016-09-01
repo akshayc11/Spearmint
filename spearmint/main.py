@@ -243,6 +243,9 @@ def get_options():
                          "Aborting.\n" % (expt_dir))
         sys.exit(-1)
 
+    # Set max number of iterations (a ridiculuous number for now
+    if not "max-finished-jobs" in options:
+        options["max-finished-jobs"] = 100000
     return options, expt_dir
 
 def main():
@@ -259,7 +262,6 @@ def main():
     db_address = options['database']['address']
     sys.stderr.write('Using database at %s.\n' % db_address)        
     db         = MongoDB(database_address=db_address)
-    
     while True:
 
         for resource_name, resource in resources.iteritems():
@@ -281,6 +283,7 @@ def main():
                 
                 # Remove any broken jobs from pending.
                 remove_broken_jobs(db, jobs, experiment_name, resources)
+
 
                 # Get a suggestion for the next job
                 suggested_job = get_suggestion(chooser, resource.tasks, db, expt_dir, options, resource_name)
@@ -305,8 +308,16 @@ def main():
 
         # If no resources are accepting jobs, sleep
         # (they might be accepting if suggest takes a while and so some jobs already finished by the time this point is reached)
+
         if tired(db, experiment_name, resources):
             time.sleep(options.get('polling-time', 5))
+        if done(db, experiment_name, resources):
+            return
+            # jobs = load_jobs(db, experiment_name)
+            # num_jobs = len(jobs)
+            # if num_jobs >= options["max-finished-jobs"]:
+            #     done = True
+            #     return
 
 def tired(db, experiment_name, resources):
     """
@@ -316,6 +327,17 @@ def tired(db, experiment_name, resources):
     for resource_name, resource in resources.iteritems():
         if resource.acceptingJobs(jobs):
             return False
+    return True
+
+def done(db, experiment_name, resources):
+    """
+    return True if max number of jobs is done
+    """
+    jobs = load_jobs(db, experiment_name)
+    for resource_name, resource in resources.iteritems():
+        if not resource.completedJobs(jobs):
+            return False
+
     return True
 
 def remove_broken_jobs(db, jobs, experiment_name, resources):
