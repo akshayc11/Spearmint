@@ -32,13 +32,17 @@ def release_device(f):
 def get_wer_rtf(frame_size, frame_shift, num_mel_bins, context, num_layers,hidden_layer_size):
     feat_prefix='{}_{}_{}'.format(frame_size, frame_shift, num_mel_bins)
     out_dir='exp/dnn_fbank_{}_lc{}_rc{}_l{}_h{}'.format(feat_prefix, context, context, num_layers, hidden_layer_size)
-    with open(os.path.join(out_dir, 'best_wer'),'r') as f:
-        res = f.readline()
-    print res
-    comps = res.split(' ')
-    wer = float(comps[1].split(':')[1])
-    rtf = float(comps[2].split(':')[1])
-    return wer, rtf
+    try:
+        with open(os.path.join(out_dir, 'best_wer'),'r') as f:
+            res = f.readline()
+            print res
+        comps = res.split(' ')
+        wer = float(comps[1].split(':')[1])
+        rtf = float(comps[2].split(':')[1])
+        return wer, rtf
+    except:
+        print "Something went wrong. Assuming max error"
+        return 1.0, 10.0
 
 def train_and_decode(frame_size, frame_shift, num_mel_bins, context, num_layers,hidden_layer_size):
     os.chdir(a3_dir)
