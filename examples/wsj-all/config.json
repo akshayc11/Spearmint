@@ -1,0 +1,100 @@
+{
+    "language" : "PYTHON",
+    "main-file": "dnn_train",
+    "experiment-name": "wsj-constrained-all",
+    "polling-time"    : 1,
+    "resources" : {
+        "my-machine" : {
+            "scheduler"         : "local",
+            "max-concurrent"    : 1,
+            "max-finished-jobs" : 30
+        }
+    },
+
+    "variables": {
+	"frame_size": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 9
+	},
+	"frame_shift": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 4
+	},
+	"num_mel_bins": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 9
+	},
+	"context": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 9
+	},
+	"num_layers": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 1,
+	    "max": 6
+	},
+	"hidden_layer_size": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 9
+	},
+	"ac" : {
+	    "type" : "FLOAT",
+	    "size" : 1,
+	    "min"  : 0.05,
+	    "max"  : 0.15
+	},
+	"b" : {
+	    "type" : "FLOAT",
+	    "size" : 1,
+	    "min"  : 10,
+	    "max"  : 18
+	},
+	"lb" : {
+	    "type" : "FLOAT",
+	    "size" : 1,
+	    "min"  : 4,
+	    "max"  : 9
+	},
+	"mina" : {
+	    "type" : "INT",
+	    "size" : 1,
+	    "min"  : 0,
+	    "max"  : 11
+	},
+	"maxa" : {
+	    "type" : "INT",
+	    "size" : 1,
+	    "min"  : 0,
+	    "max"  : 10
+	},
+	"pr" : {
+	    "type": "INT",
+	    "size" : 1,
+	    "min" : 0,
+	    "max" : 8
+	}
+    },
+    "tasks": {
+	"wer": {
+	    "type": "OBJECTIVE",
+	    "likelihood": "NOISELESS",
+	    "resources" : ["my-machine"]
+	},
+	"rtf_constraint": {
+	    "type": "CONSTRAINT",
+	    "likelihood": "NOISELESS",
+	    "resources" : ["my-machine"]
+	}
+    }
+}
