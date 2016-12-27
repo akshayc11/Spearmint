@@ -245,3 +245,39 @@ class PBSScheduler(AbstractClusterScheduler):
             return False
         else:
             return True
+
+    def kill(self, process_id):
+        killed = False
+        try:
+            status = self.pbsquery.getjob(str(process_id))['job_state'][0]
+        except:
+            # Job not found
+            status = -1
+            sys.stderr.write("EXC: %s\n" % str(sys.exc_info()[0]))
+            sys.stderr.write("Could not find job for process id: {}\n".format(
+                process_id))
+            return False
+        if status == 'Q':
+            sys.stderr.write('Job %d waiting in queue.\n' % (process_id))
+            killed = False
+        elif status == 'R':
+            sys.stderr.write('Job %d is running.\n' % (process_id))
+            killed = False
+        elif status in ['H', 'S']:
+            sys.stderr.write('Job %d is held or suspended.\n' % (process_id))
+            killed = True
+        
+        if not killed:
+            try:
+                # Kill the job
+                c = pbs.pbs_connect(pbs.pbs_default())
+                result = pbs.pbs_deljob(c, str(process_id))
+                sys.stderr.write("Killed job %d.\n" % (process_id))
+                return True
+            except:
+                sys.stderr.write("Failed to kill job %d.\n" %(process_id))
+                return False
+        else:
+            return True
+
+        

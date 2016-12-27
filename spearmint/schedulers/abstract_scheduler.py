@@ -199,6 +199,9 @@ class AbstractScheduler(object):
     def alive(self):
         pass
 
+    @abstractmethod
+    def kill(self):
+        pass
 
 
 

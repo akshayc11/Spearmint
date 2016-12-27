@@ -187,6 +187,7 @@ from abstract_scheduler import AbstractScheduler
 import os
 import subprocess
 import sys
+import signal
 
 def init(*args, **kwargs):
     return LocalScheduler(*args, **kwargs)
@@ -236,4 +237,15 @@ class LocalScheduler(AbstractScheduler):
             return False
         else:
             return True
+
+    def kill(self, process_id):
+        try:
+            os.kill(process_id, signal.SIGTERM)
+            return True
+        except OSError:
+            # Job is no longer running
+            return False
+        else:
+            return True
+
 
