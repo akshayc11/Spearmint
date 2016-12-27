@@ -372,3 +372,13 @@ class Resource(object):
 
         return process_id
 
+    def killJob(self, job):
+        """Kill a particular job
+        """
+        if job['resource'] != self.name:
+            raise Exception("This job does not belong to me!")
+        return self.scheduler.kill(job['proc_id'])
+
+    
+
+
