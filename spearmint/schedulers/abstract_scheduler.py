@@ -201,7 +201,20 @@ class AbstractScheduler(object):
 
     @abstractmethod
     def kill(self):
+        '''
+        Kill a process.
+        '''
         pass
 
+    @abstractmethod
+    def check_validation_accs(self, job_id, experiment_name, experiment_dir,
+            database_address):
+        '''
+        Will call a process to get the validation accuracies for a given
+        job-id and update the job dict with the updated list. It will also
+        ensure that a flag is set in the dict to indicate whether the job
+        has been updated.
+        '''
+        pass
 
 

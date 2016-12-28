@@ -372,6 +372,33 @@ class Resource(object):
 
         return process_id
 
+    def attemptDispatchValidation(self, experiment_name, job, db_address,
+        expt_dir):
+        """Submit a validation check job using the scheduler
+        Parameters:
+        -----------
+        experiment_name: str
+        job: dict
+        db_address: str
+        expt_dir: str
+
+        Returns
+        -------
+        process_id: str
+        """
+        if job['resource'] != self.name:
+            raise Exception("This job does not belong to me!")
+
+        process_id = self.scheduler.check_validation_accs(self, job_id,
+            experiment_name, expt_dir);
+
+        if process_id is not None:
+            sys.stderr.write('Failed to submit validation check for job %d.\n'
+                % job['id'])
+
+        return process_id
+
+
     def killJob(self, job):
         """Kill a particular job
         """

@@ -379,3 +379,55 @@ class AbstractClusterScheduler(object):
             pass
 
         return not alive
+
+    def check_validation_accs(self, job_id, experiment_name, experiment_dir,
+            database_address):
+        '''
+        Based on the submit function above. Untested.
+        '''
+        base_path = os.path.dirname(os.path.realpath(spearmint.__file__))
+        run_command = '#!/bin/bash\n'
+        if "environment-file" in self.options:
+            run_command += 'source %s\n' % self.options["environment-file"]
+        run_command += 'cd %s\n' % base_path
+        run_command += 'python launcher.py --database-address=%s --experiment-name=%s --job-id=%s --validation True %s' % \
+               (database_address, experiment_name, job_id, experiment_dir)
+
+        # Since "localhost" might mean something different on the machine
+        # we are submitting to, set it to the actual name of the parent machine
+        if database_address == "localhost":
+            database_address = socket.gethostname()
+
+        output_directory = os.path.join(experiment_dir, 'output')
+        if not os.path.isdir(output_directory):
+            os.mkdir(output_directory)
+
+        # allow the user to specify a subdirectory for the output
+        if "output-subdir" in self.options:
+            output_directory = os.path.join(output_directory, self.options['output-subdir'])
+            if not os.path.isdir(output_directory):
+                os.mkdir(output_directory)
+
+        output_filename = os.path.join(output_directory, '%08d-validation.out' % job_id)
+        output_file = open(output_filename, 'w')
+
+        submit_command = self.submit_command(output_filename, '%s-%08d-valid' % (experiment_name, job_id))
+        if 'scheduler-args' in self.options:
+            submit_command += ' ' + self.options['scheduler-args']
+        # submit_command = shlex.split(submit_command)
+
+        process = subprocess.Popen(submit_command, 
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, 
+                                shell=True)
+        output, std_err = process.communicate(input=run_command)
+        process.stdin.close()
+
+        # Parse out the process id from text
+        match = re.search(self.output_regexp(), output)
+        try:
+            return int(match.group(1))
+        except:
+            sys.stderr.write(output)
+            return None
