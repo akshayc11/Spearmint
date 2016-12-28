@@ -406,17 +406,18 @@ def get_suggestion(chooser, task_names, db, expt_dir, options, resource_name):
     job_id = len(jobs) + 1
 
     job = {
-        'id'          : job_id,
-        'params'      : task_group.paramify(suggested_input),
-        'expt_dir'    : expt_dir,
-        'tasks'       : task_names,
-        'resource'    : resource_name,
-        'main-file'   : main_file,
-        'language'    : language,
-        'status'      : 'new',
-        'submit time' : time.time(),
-        'start time'  : None,
-        'end time'    : None
+        'id'              : job_id,
+        'params'          : task_group.paramify(suggested_input),
+        'expt_dir'        : expt_dir,
+        'tasks'           : task_names,
+        'resource'        : resource_name,
+        'main-file'       : main_file,
+        'language'        : language,
+        'status'          : 'new',
+        'submit time'     : time.time(),
+        'start time'      : None,
+        'end time'        : None,
+        'validation_accs' : None,
     }
 
     save_job(job, db, experiment_name)

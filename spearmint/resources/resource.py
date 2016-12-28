@@ -379,6 +379,4 @@ class Resource(object):
             raise Exception("This job does not belong to me!")
         return self.scheduler.kill(job['proc_id'])
 
-    
-
 
