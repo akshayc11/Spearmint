@@ -182,42 +182,46 @@
 # to enter into this License and Terms of Use on behalf of itself and
 # its Institution.
 
-import spearmint
+
 import os
+import re
+import socket
 import subprocess
 import sys
-import socket
-import re
-import shlex
+
 from abc import ABCMeta, abstractmethod
+
+import spearmint
+
 
 def init(*args, **kwargs):
     return AbstractClusterScheduler(*args, **kwargs)
 
+
 class AbstractClusterScheduler(object):
     __metaclass__ = ABCMeta
-    
+
     def __init__(self, options):
         self.options = options
-    
+
     @abstractmethod
     def submit_command(self, output_file):
         pass
 
-    @abstractmethod    
+    @abstractmethod
     def output_regexp(self):
         pass
 
-
-    def submit(self, job_id, experiment_name, experiment_dir, database_address):
+    def submit(self, job_id, experiment_name, experiment_dir,
+               database_address):
         base_path = os.path.dirname(os.path.realpath(spearmint.__file__))
         run_command = '#!/bin/bash\n'
         if "environment-file" in self.options:
             run_command += 'source %s\n' % self.options["environment-file"]
         run_command += 'cd %s\n' % base_path
         run_command += 'python launcher.py --database-address=%s \
-        --experiment-name=%s --job-id=%s %s' % \
-               (database_address, experiment_name, job_id, experiment_dir)
+            --experiment-name=%s --job-id=%s %s' % \
+            (database_address, experiment_name, job_id, experiment_dir)
 
         # Since "localhost" might mean something different on the machine
         # we are submitting to, set it to the actual name of the parent machine
@@ -231,24 +235,24 @@ class AbstractClusterScheduler(object):
         # allow the user to specify a subdirectory for the output
         if "output-subdir" in self.options:
             output_directory = os.path.join(output_directory,
-                self.options['output-subdir'])
+                                            self.options['output-subdir'])
             if not os.path.isdir(output_directory):
                 os.mkdir(output_directory)
 
         output_filename = os.path.join(output_directory, '%08d.out' % job_id)
-        output_file = open(output_filename, 'w')
+        # output_file = open(output_filename, 'w')
 
-        submit_command = self.submit_command(output_filename, '%s-%08d' 
-            % (experiment_name, job_id))
+        submit_command = self.submit_command(output_filename, '%s-%08d'
+                                             % (experiment_name, job_id))
         if 'scheduler-args' in self.options:
             submit_command += ' ' + self.options['scheduler-args']
         # submit_command = shlex.split(submit_command)
 
-        process = subprocess.Popen(submit_command, 
-                                stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, 
-                                shell=True)
+        process = subprocess.Popen(submit_command,
+                                   stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT,
+                                   shell=True)
         output, std_err = process.communicate(input=run_command)
         process.stdin.close()
 
@@ -259,7 +263,6 @@ class AbstractClusterScheduler(object):
         except:
             sys.stderr.write(output)
             return None
-
 
     def alive(self, process_id):
         # This wastes a bit of time, but prevents
@@ -277,8 +280,8 @@ class AbstractClusterScheduler(object):
         except:
             # job not found
             sys.stderr.write("EXC: %s\n" % str(sys.exc_info()[0]))
-            sys.stderr.write("Could not find job for rocess id %d\n" 
-                % process_id)
+            sys.stderr.write("Could not find job for rocess id %d\n"
+                             % process_id)
             try:
                 s.exit()
             except:
@@ -289,12 +292,13 @@ class AbstractClusterScheduler(object):
             alive = True
 
         elif status == drmaa.JobState.DONE:
-            sys.stderr.write("Process %d complete but not yet updated.\n" 
-                % process_id)
+            sys.stderr.write("Process %d complete but not yet updated.\n"
+                             % process_id)
             alive = True
 
         elif status == drmaa.JobState.UNDETERMINED:
-            sys.stderr.write("Process %d in undetermined state.\n" % process_id)
+            sys.stderr.write("Process %d in undetermined state.\n"
+                             % process_id)
             alive = False
 
         elif status in [drmaa.JobState.SYSTEM_ON_HOLD,
@@ -334,8 +338,8 @@ class AbstractClusterScheduler(object):
         except:
             # job not found
             sys.stderr.write("EXC: %s\n" % str(sys.exc_info()[0]))
-            sys.stderr.write("Could not find job for process id %d\n" 
-                % process_id)
+            sys.stderr.write("Could not find job for process id %d\n"
+                             % process_id)
             try:
                 s.exit()
             except:
@@ -346,12 +350,13 @@ class AbstractClusterScheduler(object):
             alive = True
 
         elif status == drmaa.JobState.DONE:
-            sys.stderr.write("Process %d complete but not yet updated.\n" 
-                % process_id)
+            sys.stderr.write("Process %d complete but not yet updated.\n"
+                             % process_id)
             alive = True
 
         elif status == drmaa.JobState.UNDETERMINED:
-            sys.stderr.write("Process %d in undetermined state.\n" % process_id)
+            sys.stderr.write("Process %d in undetermined state.\n"
+                             % process_id)
             alive = False
 
         elif status in [drmaa.JobState.SYSTEM_ON_HOLD,
@@ -371,8 +376,8 @@ class AbstractClusterScheduler(object):
             try:
                 s.control(str(process_id), drmaa.JobControlAction.TERMINATE)
             except:
-                sys.stderr.write("Process %d failed to be killed.\n" 
-                    %(process_id))
+                sys.stderr.write("Process %d failed to be killed.\n"
+                                 % (process_id))
                 try:
                     s.exit()
                 except:
@@ -388,7 +393,7 @@ class AbstractClusterScheduler(object):
         return not alive
 
     def check_validation_accs(self, job_id, experiment_name, experiment_dir,
-            database_address):
+                              database_address):
         '''
         Based on the submit function above. Untested.
         '''
@@ -398,8 +403,8 @@ class AbstractClusterScheduler(object):
             run_command += 'source %s\n' % self.options["environment-file"]
         run_command += 'cd %s\n' % base_path
         run_command += 'python launcher.py --database-address=%s \
-        --experiment-name=%s --job-id=%s --validation True %s' % \
-               (database_address, experiment_name, job_id, experiment_dir)
+            --experiment-name=%s --job-id=%s --validation True %s' % \
+            (database_address, experiment_name, job_id, experiment_dir)
 
         # Since "localhost" might mean something different on the machine
         # we are submitting to, set it to the actual name of the parent machine
@@ -413,25 +418,25 @@ class AbstractClusterScheduler(object):
         # allow the user to specify a subdirectory for the output
         if "output-subdir" in self.options:
             output_directory = os.path.join(output_directory,
-                self.options['output-subdir'])
+                                            self.options['output-subdir'])
             if not os.path.isdir(output_directory):
                 os.mkdir(output_directory)
 
-        output_filename = os.path.join(output_directory, '%08d-validation.out' 
-            % job_id)
-        output_file = open(output_filename, 'w')
+        output_filename = os.path.join(output_directory, '%08d-validation.out'
+                                       % job_id)
+        # output_file = open(output_filename, 'w')
 
-        submit_command = self.submit_command(output_filename, '%s-%08d-valid' 
-            % (experiment_name, job_id))
+        submit_command = self.submit_command(output_filename, '%s-%08d-valid'
+                                             % (experiment_name, job_id))
         if 'scheduler-args' in self.options:
             submit_command += ' ' + self.options['scheduler-args']
         # submit_command = shlex.split(submit_command)
 
-        process = subprocess.Popen(submit_command, 
-                                stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, 
-                                shell=True)
+        process = subprocess.Popen(submit_command,
+                                   stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT,
+                                   shell=True)
         output, std_err = process.communicate(input=run_command)
         process.stdin.close()
 

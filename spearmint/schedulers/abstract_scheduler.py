@@ -185,14 +185,16 @@
 
 from abc import ABCMeta, abstractmethod
 
+
 class AbstractScheduler(object):
     __metaclass__ = ABCMeta
 
     def __init__(self, options):
         self.options = options
-        
+
     @abstractmethod
-    def submit(self, job_id, experiment_name, experiment_dir, database_address):
+    def submit(self, job_id, experiment_name, experiment_dir,
+               database_address):
         pass
 
     @abstractmethod
@@ -208,7 +210,7 @@ class AbstractScheduler(object):
 
     @abstractmethod
     def check_validation_accs(self, job_id, experiment_name, experiment_dir,
-            database_address):
+                              database_address):
         '''
         Will call a process to get the validation accuracies for a given
         job-id and update the job dict with the updated list. It will also
@@ -216,5 +218,3 @@ class AbstractScheduler(object):
         has been updated.
         '''
         pass
-
-

@@ -182,40 +182,68 @@
 # to enter into this License and Terms of Use on behalf of itself and
 # its Institution.
 
-import spearmint
-from abstract_scheduler import AbstractScheduler
 import os
+import signal
 import subprocess
 import sys
-import signal
+
+
+from abstract_scheduler import AbstractScheduler
+
+import spearmint
+
 
 def init(*args, **kwargs):
     return LocalScheduler(*args, **kwargs)
 
-class LocalScheduler(AbstractScheduler):
-    """scheduler which submits jobs to the local machine via a shell command"""
 
-    def submit(self, job_id, experiment_name, experiment_dir, database_address):
+class LocalScheduler(AbstractScheduler):
+    """Local Scheduler for local machine
+
+    scheduler which submits jobs to the local machine via a shell command
+
+    Extends:
+        AbstractScheduler
+    """
+
+    def submit(self, job_id, experiment_name, experiment_dir,
+               database_address):
+        """Main job submission function
+
+        Submit the main job for an experiment given job ID
+
+        Arguments:
+            job_id {str} -- Job ID
+            experiment_name {str} -- Name of the experiment
+            experiment_dir {str} -- Directory of the experiment
+            database_address {str} -- Address of database
+
+        Returns:
+            int -- PID of launched process. None if failed.
+        """
+
         base_path = os.path.dirname(os.path.realpath(spearmint.__file__))
-        cmd = ('python %s/launcher.py --database-address %s --experiment-name %s --job-id %s' % 
+        cmd = ('python %s/launcher.py --database-address %s \
+            --experiment-name %s --job-id %s' %
                (base_path, database_address, experiment_name, job_id))
-        
+
         output_directory = os.path.join(experiment_dir, 'output')
         if not os.path.isdir(output_directory):
             os.mkdir(output_directory)
 
         # allow the user to specify a subdirectory for the output
         if "output-subdir" in self.options:
-            output_directory = os.path.join(output_directory, self.options['output-subdir'])
+            output_directory = os.path.join(output_directory,
+                                            self.options['output-subdir'])
             if not os.path.isdir(output_directory):
                 os.mkdir(output_directory)
 
         output_filename = os.path.join(output_directory, '%08d.out' % job_id)
         output_file = open(output_filename, 'w')
 
-        process = subprocess.Popen(cmd, stdout=output_file, 
-                                        stderr=output_file, 
-                                        shell=True)
+        process = subprocess.Popen(cmd, stdout=output_file,
+                                   stderr=output_file,
+                                   shell=True)
 
         process.poll()
         if process.returncode is not None and process.returncode < 0:
@@ -226,9 +254,18 @@ class LocalScheduler(AbstractScheduler):
             # sys.stderr.write("Submitted job as process: %d\n" % process.pid)
 
         return process.pid
-        
 
     def alive(self, process_id):
+        """Check wether a PID is alive
+
+        Checks whether a PID launched by the submit function is alive
+
+        Arguments:
+            process_id {str} -- The process ID of interest
+
+        Returns:
+            bool -- true if alive, else false.
+        """
         try:
             # Send an alive signal to proc (note this could kill it in windows)
             os.kill(process_id, 0)
@@ -239,6 +276,16 @@ class LocalScheduler(AbstractScheduler):
             return True
 
     def kill(self, process_id):
+        """Kill a process given ID
+
+        Given a PID, terminate it with the SIGTERM command
+        NOTE: Untested
+        Arguments:
+            process_id {str} -- The process ID of interest
+
+        Returns:
+            bool -- true if killed, else false.
+        """
         try:
             os.kill(process_id, signal.SIGTERM)
             return True
@@ -248,31 +295,46 @@ class LocalScheduler(AbstractScheduler):
         else:
             return True
 
-    def check_validation_accs(self, job_id, experiment_name, experiment_dir, database_address):
-        '''
-        Based on the submit template from above. Untested
-        TODO: test
-        '''
+    def check_validation_accs(self, job_id, experiment_name, experiment_dir,
+                              database_address):
+        """Runs the get_validation_accuracies function
+
+        Runs the get_validation_accuracies function in the experiment using
+        the launcher.py module.
+        NOTE: Untested.
+        Arguments:
+            job_id {str} -- Job ID
+            experiment_name {str} -- Name of the experiment
+            experiment_dir {str} -- Directory of the experiment
+            database_address {str} -- Address of database
+
+        Returns:
+            int -- PID of launched process. None if failed.
+        """
+
         base_path = os.path.dirname(os.path.realpath(spearmint.__file__))
-        cmd = ('python %s/launcher.py --database-address %s --experiment-name %s --job-id %s --validation True' % 
+        cmd = ('python %s/launcher.py --database-address %s \
+            --experiment-name %s --job-id %s --validation True' %
                (base_path, database_address, experiment_name, job_id))
-        
+
         output_directory = os.path.join(experiment_dir, 'output')
         if not os.path.isdir(output_directory):
             os.mkdir(output_directory)
 
         # allow the user to specify a subdirectory for the output
         if "output-subdir" in self.options:
-            output_directory = os.path.join(output_directory, self.options['output-subdir'])
+            output_directory = os.path.join(output_directory,
+                                            self.options['output-subdir'])
             if not os.path.isdir(output_directory):
                 os.mkdir(output_directory)
 
-        output_filename = os.path.join(output_directory, '%08d-validation.out' % job_id)
+        output_filename = os.path.join(output_directory,
+                                       '%08d-validation.out' % job_id)
         output_file = open(output_filename, 'w')
 
-        process = subprocess.Popen(cmd, stdout=output_file, 
-                                        stderr=output_file, 
-                                        shell=True)
+        process = subprocess.Popen(cmd, stdout=output_file,
+                                   stderr=output_file,
+                                   shell=True)
 
         process.poll()
         if process.returncode is not None and process.returncode < 0:
@@ -283,5 +345,3 @@ class LocalScheduler(AbstractScheduler):
             # sys.stderr.write("Submitted job as process: %d\n" % process.pid)
 
         return process.pid
-
-
