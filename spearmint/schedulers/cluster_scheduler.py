@@ -215,7 +215,8 @@ class AbstractClusterScheduler(object):
         if "environment-file" in self.options:
             run_command += 'source %s\n' % self.options["environment-file"]
         run_command += 'cd %s\n' % base_path
-        run_command += 'python launcher.py --database-address=%s --experiment-name=%s --job-id=%s %s' % \
+        run_command += 'python launcher.py --database-address=%s \
+        --experiment-name=%s --job-id=%s %s' % \
                (database_address, experiment_name, job_id, experiment_dir)
 
         # Since "localhost" might mean something different on the machine
@@ -229,14 +230,16 @@ class AbstractClusterScheduler(object):
 
         # allow the user to specify a subdirectory for the output
         if "output-subdir" in self.options:
-            output_directory = os.path.join(output_directory, self.options['output-subdir'])
+            output_directory = os.path.join(output_directory,
+                self.options['output-subdir'])
             if not os.path.isdir(output_directory):
                 os.mkdir(output_directory)
 
         output_filename = os.path.join(output_directory, '%08d.out' % job_id)
         output_file = open(output_filename, 'w')
 
-        submit_command = self.submit_command(output_filename, '%s-%08d' % (experiment_name, job_id))
+        submit_command = self.submit_command(output_filename, '%s-%08d' 
+            % (experiment_name, job_id))
         if 'scheduler-args' in self.options:
             submit_command += ' ' + self.options['scheduler-args']
         # submit_command = shlex.split(submit_command)
@@ -274,7 +277,8 @@ class AbstractClusterScheduler(object):
         except:
             # job not found
             sys.stderr.write("EXC: %s\n" % str(sys.exc_info()[0]))
-            sys.stderr.write("Could not find job for rocess id %d\n" % process_id)
+            sys.stderr.write("Could not find job for rocess id %d\n" 
+                % process_id)
             try:
                 s.exit()
             except:
@@ -285,7 +289,8 @@ class AbstractClusterScheduler(object):
             alive = True
 
         elif status == drmaa.JobState.DONE:
-            sys.stderr.write("Process %d complete but not yet updated.\n" % process_id)
+            sys.stderr.write("Process %d complete but not yet updated.\n" 
+                % process_id)
             alive = True
 
         elif status == drmaa.JobState.UNDETERMINED:
@@ -329,7 +334,8 @@ class AbstractClusterScheduler(object):
         except:
             # job not found
             sys.stderr.write("EXC: %s\n" % str(sys.exc_info()[0]))
-            sys.stderr.write("Could not find job for process id %d\n" % process_id)
+            sys.stderr.write("Could not find job for process id %d\n" 
+                % process_id)
             try:
                 s.exit()
             except:
@@ -340,7 +346,8 @@ class AbstractClusterScheduler(object):
             alive = True
 
         elif status == drmaa.JobState.DONE:
-            sys.stderr.write("Process %d complete but not yet updated.\n" % process_id)
+            sys.stderr.write("Process %d complete but not yet updated.\n" 
+                % process_id)
             alive = True
 
         elif status == drmaa.JobState.UNDETERMINED:
@@ -390,7 +397,8 @@ class AbstractClusterScheduler(object):
         if "environment-file" in self.options:
             run_command += 'source %s\n' % self.options["environment-file"]
         run_command += 'cd %s\n' % base_path
-        run_command += 'python launcher.py --database-address=%s --experiment-name=%s --job-id=%s --validation True %s' % \
+        run_command += 'python launcher.py --database-address=%s \
+        --experiment-name=%s --job-id=%s --validation True %s' % \
                (database_address, experiment_name, job_id, experiment_dir)
 
         # Since "localhost" might mean something different on the machine
@@ -404,14 +412,17 @@ class AbstractClusterScheduler(object):
 
         # allow the user to specify a subdirectory for the output
         if "output-subdir" in self.options:
-            output_directory = os.path.join(output_directory, self.options['output-subdir'])
+            output_directory = os.path.join(output_directory,
+                self.options['output-subdir'])
             if not os.path.isdir(output_directory):
                 os.mkdir(output_directory)
 
-        output_filename = os.path.join(output_directory, '%08d-validation.out' % job_id)
+        output_filename = os.path.join(output_directory, '%08d-validation.out' 
+            % job_id)
         output_file = open(output_filename, 'w')
 
-        submit_command = self.submit_command(output_filename, '%s-%08d-valid' % (experiment_name, job_id))
+        submit_command = self.submit_command(output_filename, '%s-%08d-valid' 
+            % (experiment_name, job_id))
         if 'scheduler-args' in self.options:
             submit_command += ' ' + self.options['scheduler-args']
         # submit_command = shlex.split(submit_command)
