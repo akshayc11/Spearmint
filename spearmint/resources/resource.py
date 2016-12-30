@@ -182,33 +182,44 @@
 # to enter into this License and Terms of Use on behalf of itself and
 # its Institution.
 
-
-import spearmint
-
 import importlib
-from operator import add
-import numpy as np
 import sys
 
+from operator import add
+
+import numpy as np
+
+
 def parse_resources_from_config(config):
-    """Parse the config dict and return a dictionary of resource objects keyed by resource name"""
+    """
+    Parse the config dict and return a dictionary of resource objects keyed
+    by resource name
+    """
 
     # If the user did not explicitly specify resources
     if "resources" not in config:
         default_resource_name = 'Main'
-        task_names = parse_tasks_in_resource_from_config(config, default_resource_name)
-        return {default_resource_name : resource_factory(default_resource_name, task_names, config)}
+        task_names = parse_tasks_in_resource_from_config(config,
+                                                         default_resource_name)
+        return {default_resource_name: resource_factory(default_resource_name,
+                                                        task_names,
+                                                        config)}
 
     # If resources are specified
     else:
         resources = dict()
         for resource_name, resource_opts in config["resources"].iteritems():
-            task_names = parse_tasks_in_resource_from_config(config, resource_name)
-            resources[resource_name] = resource_factory(resource_name, task_names, resource_opts)
+            task_names = parse_tasks_in_resource_from_config(config,
+                                                             resource_name)
+            resources[resource_name] = resource_factory(resource_name,
+                                                        task_names,
+                                                        resource_opts)
         return resources
 
+
 def parse_tasks_in_resource_from_config(config, resource_name):
-    """parse the config dict and return a list of task names that use the given resource name"""
+    """parse the config dict and return a list of task names that use the given
+       resource name"""
     # If the user did not explicitly specify tasks, then we have to assume
     # the single task runs on all resources
     # TODO: THIS IS VERY DANGEROUS, BECAUSE THE TASK MIGHT NOT NAMED MAIN
@@ -218,55 +229,65 @@ def parse_tasks_in_resource_from_config(config, resource_name):
     else:
         tasks = list()
         for task_name, task_config in config["tasks"].iteritems():
-            # If the user specified tasks but not specific resources for those tasks,
-            # We have to assume the tasks run on all resources...
+            # If the user specified tasks but not specific resources for those
+            #  tasks, we have to assume the tasks run on all resources...
             if "resources" not in task_config:
                 tasks.append(task_name)
             else:
                 if resource_name in task_config["resources"]:
                     tasks.append(task_name)
 
-        return tasks 
+        return tasks
 
 
 def resource_factory(resource_name, task_names, config):
-    """return a resource object constructed from the resource name, task names, and config dict"""
-    scheduler_class  = config.get("scheduler", "local")
-    scheduler_object = importlib.import_module('spearmint.schedulers.' + scheduler_class).init(config)
+    """
+    return a resource object constructed from the resource name, task names,
+     and config dict
+    """
+    scheduler_class = config.get("scheduler", "local")
+    scheduler_object = importlib.import_module('spearmint.schedulers.' +
+                                               scheduler_class).init(config)
 
     max_concurrent = config.get('max-concurrent', 1)
     max_finished_jobs = config.get('max-finished-jobs', np.inf)
 
-    return Resource(resource_name, task_names, scheduler_object, 
+    return Resource(resource_name, task_names, scheduler_object,
                     scheduler_class, max_concurrent, max_finished_jobs)
+
 
 def print_resources_status(resources, jobs):
     """Print out the status of the resources"""
     if len(resources) == 1:
         sys.stderr.write('Status: %d pending, %d complete.\n\n'
-            % (resources[0].numPending(jobs), resources[0].numComplete(jobs)))
+                         % (resources[0].num_pending(jobs),
+                            resources[0].num_complete(jobs)))
     else:
         sys.stderr.write('\nResources:      ')
-        left_indent=16
-        indentation = ' '*left_indent
+        left_indent = 16
+        indentation = ' ' * left_indent
 
         sys.stderr.write('NAME          PENDING    COMPLETE\n')
         sys.stderr.write(indentation)
         sys.stderr.write('----          -------    --------\n')
-        totalPending = 0
-        totalComplete = 0
+        total_pending = 0
+        total_complete = 0
         for resource in resources:
-            p = resource.numPending(jobs)
-            c = resource.numComplete(jobs)
-            totalPending += p
-            totalComplete += c
-            sys.stderr.write("%s%-12.12s  %-9d  %-10d\n" % (indentation, resource.name, p, c))
-        sys.stderr.write("%s%-12.12s  %-9d  %-10d\n" % (indentation, '*TOTAL*', totalPending, totalComplete))
+            p = resource.num_pending(jobs)
+            c = resource.num_complete(jobs)
+            total_pending += p
+            total_complete += c
+            sys.stderr.write("%s%-12.12s  %-9d  %-10d\n"
+                             % (indentation, resource.name, p, c))
+        sys.stderr.write("%s%-12.12s  %-9d  %-10d\n"
+                         % (indentation, '*TOTAL*', total_pending,
+                            total_complete))
         sys.stderr.write('\n')
+
 
 class Resource(object):
     """class which manages the job resources
-    
+
     Parameters
     ----------
     name : str
@@ -283,78 +304,84 @@ class Resource(object):
         The maximum number of jobs that will be run to completion
     """
 
-    def __init__(self, name, tasks, scheduler, scheduler_class, max_concurrent, max_finished_jobs):
-        self.name              = name
-        self.scheduler         = scheduler
-        self.scheduler_class   = scheduler_class   # stored just for printing
-        self.max_concurrent    = max_concurrent
+    def __init__(self, name, tasks, scheduler, scheduler_class, max_concurrent,
+                 max_finished_jobs):
+        self.name = name
+        self.scheduler = scheduler
+        self.scheduler_class = scheduler_class   # stored just for printing
+        self.max_concurrent = max_concurrent
         self.max_finished_jobs = max_finished_jobs
-        self.tasks             = tasks
+        self.tasks = tasks
 
         if len(self.tasks) == 0:
-            sys.stderr.write("Warning: resource %s has no tasks assigned to it" % self.name)
+            sys.stderr.write("Warning: resource %s has no tasks assigned to it"
+                             % self.name)
 
-    def filterMyJobs(self, jobs):
-        """Take a list of jobs and filter only those that are running/run on this resource"""
+    def filter_my_jobs(self, jobs):
+        """Take a list of jobs and filter only those that are running/run on
+        this resource
+        """
         if jobs:
-            return filter(lambda job: job['resource']==self.name, jobs)
+            return filter(lambda job: job['resource'] == self.name, jobs)
         else:
             return jobs
 
-    def numPending(self, jobs):
-        jobs = self.filterMyJobs(jobs)
+    def num_pending(self, jobs):
+        jobs = self.filter_my_jobs(jobs)
         if jobs:
-            pending_jobs = map(lambda x: x['status'] in ['pending', 'new'], jobs)
+            pending_jobs = map(lambda x: x['status'] in ['pending', 'new'],
+                               jobs)
             return reduce(add, pending_jobs, 0)
         else:
             return 0
 
-    def numComplete(self, jobs):
-        jobs = self.filterMyJobs(jobs)
+    def num_complete(self, jobs):
+        jobs = self.filter_my_jobs(jobs)
         if jobs:
             completed_jobs = map(lambda x: x['status'] == 'complete', jobs)
             return reduce(add, completed_jobs, 0)
         else:
             return 0
 
-    def acceptingJobs(self, jobs):
+    def accepting_jobs(self, jobs):
         """Is this resource currently accepting new jobs?"""
-        if self.numPending(jobs) >= self.max_concurrent:
-            return False
-        
-        if self.numComplete(jobs) >= self.max_finished_jobs:
+        if self.num_pending(jobs) >= self.max_concurrent:
             return False
 
-        return True 
-    
-    def completedJobs(self, jobs):
+        if self.num_complete(jobs) >= self.max_finished_jobs:
+            return False
+
+        return True
+
+    def completed_jobs(self, jobs):
         """Has the resource completed all jobs"""
-        if self.numComplete(jobs) >= self.max_finished_jobs:
+        if self.num_complete(jobs) >= self.max_finished_jobs:
             return True
 
         return False
 
-    def printStatus(self, jobs):
-        sys.stderr.write("%-12s: %5d pending %5d complete\n" %
-            (self.name, self.numPending(jobs), self.numComplete(jobs)))
+    def print_status(self, jobs):
+        sys.stderr.write("%-12s: %5d pending %5d complete\n"
+                         % (self.name, self.num_pending(jobs),
+                            self.num_complete(jobs)))
 
-    def isJobAlive(self, job):
+    def is_job_alive(self, job):
         """Is a particular job alive?"""
         if job['resource'] != self.name:
             raise Exception("This job does not belong to me!")
 
         return self.scheduler.alive(job['proc_id'])
 
-    def attemptDispatch(self, experiment_name, job, db_address, expt_dir):
+    def attempt_dispatch(self, experiment_name, job, db_address, expt_dir):
         """submit a new job using the scheduler
-        
+
         Parameters
         ----------
         experiment_name : str
         job : dict
         db_address : str
         expt_dir : str
-        
+
         Returns
         -------
         process_id : str
@@ -362,18 +389,21 @@ class Resource(object):
         if job['resource'] != self.name:
             raise Exception("This job does not belong to me!")
 
-        process_id = self.scheduler.submit(job['id'], experiment_name, expt_dir, db_address)
+        process_id = self.scheduler.submit(job['id'], experiment_name,
+                                           expt_dir, db_address)
 
         if process_id is not None:
-            sys.stderr.write('Submitted job %d with %s scheduler (process id: %d).\n' % 
-                (job['id'], self.scheduler_class, process_id))
+            sys.stderr.write('Submitted job %d with %s scheduler \
+                             (process id: %d).\n'
+                             % (job['id'], self.scheduler_class,
+                                process_id))
         else:
             sys.stderr.write('Failed to submit job %d.\n' % job['id'])
 
         return process_id
 
-    def attemptDispatchValidation(self, experiment_name, job, db_address,
-        expt_dir):
+    def attempt_dispatch_validation(self, experiment_name, job, db_address,
+                                    expt_dir):
         """Submit a validation check job using the scheduler
         Parameters:
         -----------
@@ -389,21 +419,19 @@ class Resource(object):
         if job['resource'] != self.name:
             raise Exception("This job does not belong to me!")
 
-        process_id = self.scheduler.check_validation_accs(self, job_id,
-            experiment_name, expt_dir);
+        process_id = self.scheduler.check_validation_accs(
+            job['id'],
+            experiment_name, expt_dir, db_address)
 
-        if process_id is not None:
+        if process_id is None:
             sys.stderr.write('Failed to submit validation check for job %d.\n'
-                % job['id'])
+                             % job['id'])
 
         return process_id
 
-
-    def killJob(self, job):
+    def kill_job(self, job):
         """Kill a particular job
         """
         if job['resource'] != self.name:
             raise Exception("This job does not belong to me!")
         return self.scheduler.kill(job['proc_id'])
-
-

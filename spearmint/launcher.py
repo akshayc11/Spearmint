@@ -182,7 +182,7 @@
 # to enter into this License and Terms of Use on behalf of itself and
 # its Institution.
 
-import optparse
+import argparse
 import os
 import sys
 import time
@@ -193,36 +193,26 @@ from spearmint.utils.database.mongodb import MongoDB
 
 
 def main():
-    parser = optparse.OptionParser(usage="usage: %prog [options]")
-    parser.add_option("--experiment-name", dest="experiment_name",
-                      help="The name of the experiment in the database.",
-                      type="string")
-
-    parser.add_option("--database-address", dest="db_address",
-                      help="The address where the database is located.",
-                      type="string")
-
-    parser.add_option("--job-id", dest="job_id",
-                      help="The id number of the job to launch \
-                            in the database.",
-                      type="int")
-
-    parser.add_option("--validation", dest="validation",
-                      help="Specify if this is to only get validation results \
-                            for a job",
-                      type=bool,
-                      default=False)
-
-    (options, args) = parser.parse_args()
-
-    if not options.experiment_name:
-        parser.error('Experiment name must be given.')
-
-    if not options.db_address:
-        parser.error('Database address must be given.')
-
-    if not options.job_id:
-        parser.error('Job ID not given or an ID of 0 was used.')
+    parser = argparse.ArgumentParser(description="usage: %prog [options]")
+    parser.add_argument('--experiment-name',
+                        help='The name of the experiment in the database',
+                        type=str,
+                        required=True)
+    parser.add_argument('--database-address', dest="db_address",
+                        help='The address where the database is located',
+                        type=str,
+                        required=True)
+    parser.add_argument('--job-id',
+                        help='The id number of the job to launch \
+                            in the database',
+                        type=int,
+                        required=True)
+    parser.add_argument('--validation',
+                        help='Specify true to get validation results for a \
+                            job',
+                        type=bool,
+                        default=False)
+    options = parser.parse_args()
 
     launch(options.db_address, options.experiment_name, options.job_id,
            options.validation)
@@ -233,10 +223,9 @@ def launch(db_address, experiment_name, job_id, validation=False):
     Launches a job from on a given id.
     """
 
-    db = MongoDB(database_address=db_address)
-    job = db.load(experiment_name, 'jobs', {'id': job_id})
-
     if validation is False:
+        db = MongoDB(database_address=db_address)
+        job = db.load(experiment_name, 'jobs', {'id': job_id})
         # We want to launch this job.
         start_time = time.time()
         job['start time'] = start_time
@@ -308,6 +297,8 @@ def launch(db_address, experiment_name, job_id, validation=False):
 
         db.save(job, experiment_name, 'jobs', {'id': job_id})
     else:
+        db = MongoDB(database_address=db_address)
+        job = db.load(experiment_name, 'jobs', {'id': job_id})
         success = False
 
         try:
@@ -317,10 +308,11 @@ def launch(db_address, experiment_name, job_id, validation=False):
                 if len(prev_validation_accs) < len(validation_accs):
                     # New validation accs have been found
                     job['validation_accs'] = validation_accs
-                    db.save(job, experiment_name, 'jobs', {'id': job_id})
-                success = True
+                    job['validation_updated'] = True
             else:
                 raise Exception("This language has not been implemented")
+
+            success = True
         except:
             import traceback
             traceback.print_exc()
@@ -328,7 +320,12 @@ def launch(db_address, experiment_name, job_id, validation=False):
             print sys.exc_info()
 
         if success:
-            sys.stderr.write("Completed successfu")
+            sys.stderr.write(
+                "Completed getting validation results for job %d.\n" % job_id)
+        else:
+            sys.stderr.write("Failed to get validation results for job %d.\n"
+                             % job_id)
+        db.save(job, experiment_name, 'jobs', {'id': job_id})
 
 
 def python_launcher(job):
@@ -427,9 +424,8 @@ def python_validation_accs(job):
 
     # TODO: add dict capability
 
-    sys.stderr.write("Got result: {}".format(validation_accs))
+    sys.stderr.write("Got result: {}.\n".format(validation_accs))
     # TODO: check if the results are a numpy array
-
     return validation_accs
 
 

@@ -253,6 +253,14 @@ def get_options():
     # Set max number of iterations (a ridiculuous number for now
     if "max-finished-jobs" not in options:
         options["max-finished-jobs"] = 100000
+
+    if "validation-check" not in options:
+        options["validation-check"] = False
+
+    if options["validation-check"] is True:
+        if "validation-check-time" not in options:
+            options["validation-check-time"] = 5
+
     return options, expt_dir
 
 
@@ -276,7 +284,7 @@ def main():
         for resource_name, resource in resources.iteritems():
 
             jobs = load_jobs(db, experiment_name)
-            # resource.printStatus(jobs)
+            # resource.print_status(jobs)
 
             # If the resource is currently accepting more jobs
             # TODO: here cost will eventually also be considered: even if the
@@ -287,7 +295,7 @@ def main():
             # You could also do it the other way, by changing "while" to "if"
             # here
 
-            while resource.acceptingJobs(jobs):
+            while resource.accepting_jobs(jobs):
 
                 # Load jobs from DB
                 # (move out of one or both loops?) would need to pass into
@@ -303,10 +311,10 @@ def main():
                                                resource_name)
 
                 # Submit the job to the appropriate resource
-                process_id = resource.attemptDispatch(experiment_name,
-                                                      suggested_job,
-                                                      db_address,
-                                                      expt_dir)
+                process_id = resource.attempt_dispatch(experiment_name,
+                                                       suggested_job,
+                                                       db_address,
+                                                       expt_dir)
 
                 # Set the status of the job appropriately (successfully
                 # submitted or not)
@@ -321,7 +329,7 @@ def main():
                 jobs = load_jobs(db, experiment_name)
 
                 # Print out the status of the resources
-                # resource.printStatus(jobs)
+                # resource.print_status(jobs)
                 print_resources_status(resources.values(), jobs)
 
         # If no resources are accepting jobs, sleep
@@ -332,18 +340,19 @@ def main():
             time.sleep(options.get('polling-time', 5))
 
         if options.get('validation-check', True) is True:
+            print "Checking Validation"
             # get list of all pending jobs
             pending_jobs = [job for job in jobs if job['status'] == 'pending']
             time.sleep(options.get('validation-check-time', 5))
             for job in pending_jobs:
-                process_id = resource.attemptDispatchValidation(
+                process_id = resource.attempt_dispatch_validation(
                     experiment_name,
                     job, db_address, expt_dir)
-            time.sleep(5)
-
+            jobs = load_jobs(db, experiment_name)
+            pending_jobs = [job for job in jobs if job['status'] == 'pending']
             for job in pending_jobs:
-                if job['validation_accuracies_updated'] is True:
-                    job['validation_accuracies_updated'] = False
+                if job['validation_updated'] is True:
+                    job['validation_updated'] = False
                     save_job(job, db, experiment_name)
 
         if done(db, experiment_name, resources):
@@ -361,7 +370,7 @@ def tired(db, experiment_name, resources):
     """
     jobs = load_jobs(db, experiment_name)
     for resource_name, resource in resources.iteritems():
-        if resource.acceptingJobs(jobs):
+        if resource.accepting_jobs(jobs):
             return False
     return True
 
@@ -372,7 +381,7 @@ def done(db, experiment_name, resources):
     """
     jobs = load_jobs(db, experiment_name)
     for resource_name, resource in resources.iteritems():
-        if not resource.completedJobs(jobs):
+        if not resource.completed_jobs(jobs):
             return False
 
     return True
@@ -386,7 +395,7 @@ def remove_broken_jobs(db, jobs, experiment_name, resources):
     if jobs:
         for job in jobs:
             if job['status'] == 'pending':
-                if not resources[job['resource']].isJobAlive(job):
+                if not resources[job['resource']].is_job_alive(job):
                     sys.stderr.write('Broken job %s detected.\n' % job['id'])
                     job['status'] = 'broken'
                     save_job(job, db, experiment_name)
@@ -455,7 +464,8 @@ def get_suggestion(chooser, task_names, db, expt_dir, options, resource_name):
         'submit time': time.time(),
         'start time': None,
         'end time': None,
-        'validation_accs': None,
+        'validation_accs': np.array([]),
+        'validation_updated': False,
     }
 
     save_job(job, db, experiment_name)
