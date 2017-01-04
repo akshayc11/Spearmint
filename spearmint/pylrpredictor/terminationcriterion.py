@@ -12,11 +12,12 @@ criterion
 # import google
 # from google.protobuf import text_format
 
+import logging
+
 from abc import abstractmethod
 from modelfactory import setup_model_combination
 
 import numpy as np
-
 
 IMPROVEMENT_PROB_THRESHOLD = 0.05
 PREDICTIVE_STD_THRESHOLD = 0.005
@@ -108,7 +109,7 @@ class TerminationCriterion(object):
         # operation.
         # """
         self.prob_x_greater_type = prob_x_greater_type
-        print 'prob_x_greater_type: ', prob_x_greater_type
+        logging.info('prob_x_greater_type:{}'.format(self.prob_x_greater_type))
 
         # The models we will be using:
         models = ["vap", "ilog2", "weibull", "pow3", "pow4", "loglog_linear",
@@ -118,7 +119,7 @@ class TerminationCriterion(object):
         # This function determines the max number of validation runs for the
         # given training
         self.xlim = xlim
-        print "xlim:", self.xlim
+        logging.info("xlim:{}".format(self.xlim))
         self.model = setup_model_combination(
             xlim=xlim,
             models=models,
@@ -172,8 +173,8 @@ class TerminationCriterion(object):
                       "predictive_std": y_std,
                       "found": True}
         else:
-            print "y_predict outside normal bounds:{} \
-            or incorrect std deviation: {}".format(y_predict, y_std)
+            logging.warn("y_predict outside normal bounds:{} \
+            or incorrect std deviation: {}".format(y_predict, y_std))
             result = {"predictive_mean": y_predict,
                       "predictive_std": y_std,
                       "found": False}
@@ -253,81 +254,90 @@ class OptimisticTerminationCriterion(TerminationCriterion):
         when to terminate.
         '''
         if len(y_list) == 0:
-            print "No y_s done yet"
-            return {"predictive_mean": None,
-                    "predictive_std": None,
-                    "found": False,
-                    'prob_gt_ybest_xlast': 0.0,
-                    "terminate": True}
-        y_curr_best = np.max(y_list)
-        if y_curr_best > y_best:
-            print "Already exceeding best. Proceed"
-            return {"predictive_mean": y_curr_best,
-                    "predictive_std": 0.0,
-                    "found": True,
-                    'prob_gt_ybest_xlast': 1.0,
-                    "terminate": False}
-
-        y = cut_beginning(y_list)
-        x = np.asarray(range(1, len(y) + 1))
-        if not self.model.fit(x, y):
-            print 'Failed in fitting, Let the training proceed in any case'
-            return {'predictive_mean': y_curr_best,
-                    'predictive_std': 0,
-                    'found': False,
-                    'prob_gt_ybest_xlast': 0,
-                    'terminate': False}
-
-        result = self.predict(thin=thin)
-        predictive_mean = result['predictive_mean']
-        predictive_std = result['predictive_std']
-        found = result['found']
-        if predictive_std < self.predictive_std_threshold:
-            # The model is pretty sure about it's prediction
-            return {'predictive_mean': predictive_mean,
-                    'predictive_std': predictive_std,
-                    'found': found,
-                    'prob_gt_ybest_xlast': 0,
-                    'terminate': found}
-
-        elif y_best is not None:
-            print "predictive_std is high. Checking probability of \
-                going higher than ybest"
-
-            if self.prob_x_greater_type == 'posterior_prob_x_greater_than':
-                prob_gt_ybest_xlast = self.model.posterior_prob_x_greater_than(
-                    self.xlim,
-                    y_best,
-                    thin=thin)
-            else:
-                prob_gt_ybest_xlast = \
-                    self.model.posterior_mean_prob_x_greater_than(self.xlim,
-                                                                  y_best,
-                                                                  thin=thin)
-
-                print "P(y > y_best) = {}".format(prob_gt_ybest_xlast)
-
-            if prob_gt_ybest_xlast < threshold:
-                # Below the threshold. Send the termination signals
-                return {'predictive_mean': predictive_mean,
-                        'predictive_std': predictive_std,
-                        'found': found,
-                        'prob_gt_ybest_xlast': prob_gt_ybest_xlast,
-                        'terminate': found}
-            else:
-                print "Continue Training"
-                return {'predictive_mean': predictive_mean,
-                        'predictive_std': predictive_std,
-                        'found': found,
-                        'prob_gt_ybest_xlast': prob_gt_ybest_xlast,
-                        'terminate': False}
+            logging.info("No y_s done yet")
+            result = {"predictive_mean": None,
+                      "predictive_std": None,
+                      "found": False,
+                      'prob_gt_ybest_xlast': 0.0,
+                      "terminate": True}
         else:
-            print "neither low std, nor ybest present"
-            return {'predictive_mean': predictive_mean,
-                    'predictive_std': predictive_std,
-                    'found': found,
-                    'prob_gt_ybest_xlast': 0,
-                    'terminate': False}
+            y_curr_best = np.max(y_list)
+            if y_curr_best > y_best:
+                logging.info("Already exceeding best. Proceed")
+                result = {"predictive_mean": y_curr_best,
+                          "predictive_std": 0.0,
+                          "found": True,
+                          'prob_gt_ybest_xlast': 1.0,
+                          "terminate": False}
+            else:
+                y = cut_beginning(y_list)
+                x = np.asarray(range(1, len(y) + 1))
+                if not self.model.fit(x, y):
+                    logging.info('Failed in fitting, Let the training proceed \
+                        in any case')
+                    result = {'predictive_mean': y_curr_best,
+                              'predictive_std': 0,
+                              'found': False,
+                              'prob_gt_ybest_xlast': 0,
+                              'terminate': False}
+
+                res = self.predict(thin=thin)
+                predictive_mean = res['predictive_mean']
+                predictive_std = res['predictive_std']
+                found = res['found']
+                if predictive_std < self.predictive_std_threshold:
+                    # The model is pretty sure about it's prediction
+                    result = {'predictive_mean': predictive_mean,
+                              'predictive_std': predictive_std,
+                              'found': found,
+                              'prob_gt_ybest_xlast': 0,
+                              'terminate': found}
+
+                elif y_best is not None:
+                    logging.info("predictive_std is high. Checking probability \
+                        of going higher than ybest")
+
+                    if self.prob_x_greater_type == \
+                            'posterior_prob_x_greater_than':
+                        prob_gt_ybest_xlast = \
+                            self.model.posterior_prob_x_greater_than(
+                                self.xlim,
+                                y_best,
+                                thin=thin)
+                    else:
+                        prob_gt_ybest_xlast = \
+                            self.model.posterior_mean_prob_x_greater_than(
+                                self.xlim,
+                                y_best,
+                                thin=thin)
+
+                    logging.info("P(y > y_best) = {}".format(
+                        prob_gt_ybest_xlast))
+
+                    if prob_gt_ybest_xlast < threshold:
+                        # Below the threshold. Send the termination signals
+                        result = {'predictive_mean': predictive_mean,
+                                  'predictive_std': predictive_std,
+                                  'found': found,
+                                  'prob_gt_ybest_xlast': prob_gt_ybest_xlast,
+                                  'terminate': found}
+                    else:
+                        logging.info("Continue Training")
+                        result = {'predictive_mean': predictive_mean,
+                                  'predictive_std': predictive_std,
+                                  'found': found,
+                                  'prob_gt_ybest_xlast': prob_gt_ybest_xlast,
+                                  'terminate': False}
+
+                else:
+                    logging.info("neither low std, nor ybest present")
+                    result = {'predictive_mean': predictive_mean,
+                              'predictive_std': predictive_std,
+                              'found': found,
+                              'prob_gt_ybest_xlast': 0,
+                              'terminate': False}
+
+        return result
 
 
 class ConservativeTerminationCriterion(TerminationCriterion):
@@ -395,7 +405,7 @@ class ConservativeTerminationCriterion(TerminationCriterion):
                       terminate.
         """
         if len(y_list) == 0:
-            print "No y_s done yet"
+            logging.info("No y_s done yet")
             result = {"predictive_mean": None,
                       "predictive_std": None,
                       "found": False,
@@ -404,7 +414,7 @@ class ConservativeTerminationCriterion(TerminationCriterion):
         else:
             y_curr_best = np.max(y_list)
             if y_curr_best > y_best:
-                print "Already exceeding best. Proceed"
+                logging.info("Already exceeding best. Proceed")
                 result = {"predictive_mean": y_curr_best,
                           "predictive_std": 0,
                           "found": True,
@@ -415,8 +425,8 @@ class ConservativeTerminationCriterion(TerminationCriterion):
                 x = np.asarray(range(1, len(y) + 1))
                 result = None
                 if not self.model.fit(x, y):
-                    print 'Failed in fitting, Let the training proceed in any \
-                        case'
+                    logging.info('Failed in fitting, Let the training proceed \
+                        in any case')
                     result = {'predictive_mean': y_curr_best,
                               'predictive_std': 0,
                               'found': False,
@@ -437,7 +447,8 @@ class ConservativeTerminationCriterion(TerminationCriterion):
                                 y_best,
                                 thin=thin)
 
-                    print "P(y > y_best) = {}".format(prob_gt_ybest_xlast)
+                    logging.info("P(y > y_best) = {}".format(
+                        prob_gt_ybest_xlast))
 
                     res = self.predict(thin=thin)
                     predictive_mean = res['predictive_mean']
@@ -454,11 +465,12 @@ class ConservativeTerminationCriterion(TerminationCriterion):
                                           prob_gt_ybest_xlast,
                                       'terminate': found}
                         else:
-                            print "std_predictive_threshold is set. \
-                                Checking the predictive_std first"
-                            print "predictive_std: {}".format(predictive_std)
+                            logging.info("std_predictive_threshold is set. \
+                                Checking the predictive_std first")
+                            logging.info("predictive_std: {}".format(
+                                predictive_std))
                             if predictive_std < self.predictive_std_threshold:
-                                print "Predicting"
+                                logging.info("Predicting")
                                 result = {'predictive_mean': predictive_mean,
                                           'predictive_std': predictive_std,
                                           'found': found,
