@@ -1,19 +1,18 @@
+"""
+Early Criterion termination file.
 
+This file contains the classes required to implement the early stopping
+criterion
 
-'''
-This file contains the classes required to implement the
-early stopping criterion
-
-'''
+"""
 # TODO: remove num_cut from xlim!
-import argparse
-import os
-import sys
+
 
 # from caffe.proto import caffe_pb2
 # import google
 # from google.protobuf import text_format
 
+from abc import abstractmethod
 from modelfactory import setup_model_combination
 
 import numpy as np
@@ -28,8 +27,10 @@ NTHREADS = 4
 
 def cut_beginning(y, threshold=0.05, look_ahead=5):
     """
-        we start at a point where we are bigger than the initial value for
-        look_ahead steps
+    Cut the first few elements from the list of y_best.
+
+    We start at a point where we are bigger than the initial value for
+    look_ahead steps
     """
     if len(y) < look_ahead:
         return y
@@ -62,16 +63,50 @@ def cut_beginning(y, threshold=0.05, look_ahead=5):
 
 
 class TerminationCriterion(object):
+    """Base class for early termination criterion check.
+
+    This is the base class of the early termination criterion checks. It sets
+    up the MCMC Model combination used for the extrapolation, and implements
+    the predict method which will be used in run time.
+
+    Variables:
+        prob_x_greater_type {string} -- type of probability to use for
+                                        termination
+        xlim {int} -- maximum number of validation steps
+        model {MCMCCurveModelCombination} -- The model object that is used for
+                                             extrapolation.
+    """
+
+    prob_x_greater_type = None
+    xlim = None
+    model = None
+
     def __init__(self, xlim, nthreads, prob_x_greater_type,
                  recency_weighting=True):
-        '''
-        This is an updated version of the termination criterion check.
-        Here, it supersedes teh existing termination criterion check by
-        returning not only the expected value of the model, but also the
-        uncertainty from the model at a given time.
-        Assumption: This is being run from the correct base folder of
-        operation.
-        '''
+        """Constructor for TerminationCriterion class.
+
+        The constructor for the TerminationCriterion class.
+        Specifies the number of threads to be used in the model for MCMC and
+        prediction.
+
+        Arguments:
+            xlim {int} -- total number of validations that are going to be run.
+            nthreads {int} -- number of threads to be used for MCMC.
+            prob_x_greater_type {string} -- whether a single sample or mean of
+                                            samples are to be used for
+                                            prediction.
+
+        Keyword Arguments:
+            recency_weighting {bool} -- [description] (default: {True})
+        """
+        # """
+        # This is an updated version of the termination criterion check.
+        # Here, it supersedes teh existing termination criterion check by
+        # returning not only the expected value of the model, but also the
+        # uncertainty from the model at a given time.
+        # Assumption: This is being run from the correct base folder of
+        # operation.
+        # """
         self.prob_x_greater_type = prob_x_greater_type
         print 'prob_x_greater_type: ', prob_x_greater_type
 
@@ -90,47 +125,128 @@ class TerminationCriterion(object):
             recency_weighting=recency_weighting,
             nthreads=nthreads)
 
-    def run(self):
+    @abstractmethod
+    def run(self, y_list, y_best, thin=PREDICTION_THINNING):
+        """The actual run function.
+
+        Abstract method to run the termination criterion check.
+
+        Decorators:
+            abstractmethod
+
+        Arguments:
+            y_list {list} -- list of floats describing result at each
+                             validation step
+            y_best {float} -- best available validation accuracy seen so far
+
+        Keyword Arguments:
+            thin {int} -- number of steps between MCMC iterations to sample
+                          (default: {PREDICTION_THINNING})
+
+        Returns:
+            [dict] -- dictionary of the predictive mean, predictive standard
+                      deviation, whether they are reasonable, probability of
+                      prediction being higher than y_best, and the decision to
+                      terminate
+        """
         pass
 
     def predict(self, thin=PREDICTION_THINNING):
-        '''
-        Predict f(x) and also the uncertainty in the form of standard deviation
-        returns (-1,-1) if not successful
-        '''
+        r"""Predict the mean and standard deviation of the extrapolation.
+
+        Predicts the mean and standard deviation of the final accuracy given
+        the model: P(y_final | y_{1:m}; \theta)
+
+        Keyword Arguments:
+            thin {int} --  (default: {PREDICTION_THINNING})
+
+        Returns:
+            [dict] -- dictionary of predictive_mean, predictive_std and whether
+                      the two are reasonable and within bounds.
+        """
         # We are mostly unlikely to improve.
         y_predict = self.model.predict(self.xlim, thin=thin)
         y_std = self.model.predictive_std(self.xlim, thin=thin)
         if y_predict >= 0. and y_predict <= 1.0 and y_std >= 0:
-            return {"predictive_mean": y_predict,
-                    "predictive_std": y_std,
-                    "found": True}
+            result = {"predictive_mean": y_predict,
+                      "predictive_std": y_std,
+                      "found": True}
         else:
             print "y_predict outside normal bounds:{} \
             or incorrect std deviation: {}".format(y_predict, y_std)
-            return {"predictive_mean": y_predict,
-                    "predictive_std": y_std,
-                    "found": False}
+            result = {"predictive_mean": y_predict,
+                      "predictive_std": y_std,
+                      "found": False}
+        return result
 
 
 class OptimisticTerminationCriterion(TerminationCriterion):
-    '''
-    Evaluates P(y_pred > y_best). If below threshold, it uses this to
-    terminate the run.
-    '''
-    def __init__(self, xlim, nthreads, prob_x_greater_type,
-                 predictive_std_threshold=None):
-        if predictive_std_threshold is None:
-            predictive_std_threshold = PREDICTIVE_STD_THRESHOLD
+    """The Optimistic Termination Criterion class.
 
+    This class is the implementation of an optimistic form of termination that
+    places more confidence on the predictive ability of the model. If the
+    model's standard deviation of prediction falls below the threshold, then
+    the result from the model is considered as truth. If not, then the
+    probability that the system will outperform the best result seen so far
+    is considered.
+
+    Extends:
+        TerminationCriterion
+
+    Variables:
+        predictive_std_threshold {float} -- The threshold below which the model
+        is considered as ground truth.
+    """
+
+    predictive_std_threshold = None
+
+    def __init__(self, xlim, nthreads, prob_x_greater_type,
+                 predictive_std_threshold=PREDICTIVE_STD_THRESHOLD):
+        """Constructor for OptimisticTerminiationCriterion.
+
+        The Constructor for the OptimisticTerminationCriterion class.
+
+        Arguments:
+            xlim {int} -- max number of validation results from a run
+            nthreads {int} -- number of threads to be used for MCMC
+            prob_x_greater_type {str} -- whether mean of samples or single
+                                         sample is to be used.
+
+        Keyword Arguments:
+            predictive_std_threshold {float} -- the threshold below which model
+                                                is considered accurate
+                                                (default:
+                                                  {PREDICTIVE_STD_THRESHOLD})
+        """
         assert predictive_std_threshold > 0
 
-        super(ConservativeTerminationCriterion,
+        super(OptimisticTerminationCriterion,
               self).__init__(xlim, nthreads, prob_x_greater_type)
         self.predictive_std_threshold = predictive_std_threshold
 
     def run(self, y_list, y_best, thin=PREDICTION_THINNING,
             threshold=IMPROVEMENT_PROB_THRESHOLD):
+        """Run method for OptimisticTerminationCriterion class.
+
+        The actual implementation of the termination criterion.
+
+        Arguments:
+            y_list {list} -- all validation results seen so far for given run.
+            y_best {float} -- best available validation seen so far.
+
+        Keyword Arguments:
+            thin {int} -- skips between sampling (default:
+                                                    {PREDICTION_THINNING})
+            threshold {float} -- threshold for probability that given run will
+                                 exceed the best seen validation result
+                                 (default: {IMPROVEMENT_PROB_THRESHOLD})
+
+        Returns:
+            [dict] -- containing predictive mean, predictive std deviation, if
+                      the two are reasonable, probability of current run
+                      exceeding best available value so far, and decision to
+                      terminate.
+        """
         '''
         This function builds the extrapolation model using y_list and y_best,
         and based on the prediction from the extrapolation model, determines
@@ -141,13 +257,15 @@ class OptimisticTerminationCriterion(TerminationCriterion):
             return {"predictive_mean": None,
                     "predictive_std": None,
                     "found": False,
+                    'prob_gt_ybest_xlast': 0.0,
                     "terminate": True}
         y_curr_best = np.max(y_list)
         if y_curr_best > y_best:
             print "Already exceeding best. Proceed"
             return {"predictive_mean": y_curr_best,
-                    "predictive_std": 0,
+                    "predictive_std": 0.0,
                     "found": True,
+                    'prob_gt_ybest_xlast': 1.0,
                     "terminate": False}
 
         y = cut_beginning(y_list)
@@ -213,104 +331,157 @@ class OptimisticTerminationCriterion(TerminationCriterion):
 
 
 class ConservativeTerminationCriterion(TerminationCriterion):
-    '''
-    Evaluates P(y_pred > y_best). If below threshold, it uses this to
-    terminate the run. This is more conservative since it also uses the
-    standard deviation of the prediction while making the decision to
-    terminate. If the system seems to predict that it will not perform
-    better than the best seen so far, but the std deviation of the prediction
-    is too high, then it will still allow the training to proceed.
-    '''
+    """The Conservative Termination Criterion class.
+
+    This class is the implementation of an conservative form of termination.
+    If the prediction probability is lesser than a threshold, we allow training
+    to continue. Else, we check if the standard deviation of the model's
+    prediction was below an optional threshold. If so, then we terminate the
+    run. If not, we let the training proceed.
+
+    Extends:
+        TerminationCriterion
+
+    Variables:
+        predictive_std_threshold {float} -- The threshold below which the model
+        is considered as ground truth.
+    """
+
+    predictive_std_threshold = None
+
     def __init__(self, xlim, nthreads, prob_x_greater_type,
                  predictive_std_threshold=None):
+        """Constructor for the ConservativeTerminationCriterion class.
+
+        The constructor for the ConservativeTerminationCriterion class.
+
+        Arguments:
+            xlim {int} -- max number of validation results from a run
+            nthreads {int} -- number of threads to be used for MCMC
+            prob_x_greater_type {str} -- whether mean of samples or single
+                                         sample is to be used.
+
+        Keyword Arguments:
+            predictive_std_threshold {float} -- the threshold below which model
+                                                is considered accurate
+                                                (default:
+                                                  {PREDICTIVE_STD_THRESHOLD})
+        """
+        self.predictive_std_threshold = predictive_std_threshold
         super(ConservativeTerminationCriterion,
               self).__init__(xlim, nthreads, prob_x_greater_type)
-        self.predictive_std_threshold = predictive_std_threshold
 
     def run(self, y_list, y_best, thin=PREDICTION_THINNING,
             threshold=IMPROVEMENT_PROB_THRESHOLD):
-        '''
-        This function builds the extrapolation model using y_list and y_best,
-        and based on the prediction from the extrapolation model, determines
-        when to terminate.
-        '''
+        """Run method for the ConservativeTerminationCriterion class.
+
+        The actual implementation of the termination criterion.
+
+        Arguments:
+            y_list {list} -- all validation results seen so far for given run.
+            y_best {float} -- best available validation seen so far.
+
+        Keyword Arguments:
+            thin {int} -- skips between sampling (default:
+                                                    {PREDICTION_THINNING})
+            threshold {float} -- threshold for probability that given run will
+                                 exceed the best seen validation result
+                                 (default: {IMPROVEMENT_PROB_THRESHOLD})
+
+        Returns:
+            [dict] -- containing predictive mean, predictive std deviation, if
+                      the two are reasonable, probability of current run
+                      exceeding best available value so far, and decision to
+                      terminate.
+        """
         if len(y_list) == 0:
             print "No y_s done yet"
-            return {"predictive_mean": None,
-                    "predictive_std": None,
-                    "found": False,
-                    'prob_gt_ybest_xlast': 0,
-                    "terminate": False}
-        y_curr_best = np.max(y_list)
-        if y_curr_best > y_best:
-            print "Already exceeding best. Proceed"
-            return {"predictive_mean": y_curr_best,
-                    "predictive_std": 0,
-                    "found": True,
-                    'prob_gt_ybest_xlast': 0,
-                    "terminate": False}
-
-        y = cut_beginning(y_list)
-        x = np.asarray(range(1, len(y) + 1))
-        if not self.model.fit(x, y):
-            print 'Failed in fitting, Let the training proceed in any case'
-            return {'predictive_mean': y_curr_best,
-                    'predictive_std': 0,
-                    'found': False,
-                    'prob_gt_ybest_xlast': 0,
-                    'terminate': False}
-
-        if self.prob_x_greater_type == 'posterior_prob_x_greater_than':
-            prob_gt_ybest_xlast = self.model.posterior_prob_x_greater_than(
-                self.xlim,
-                y_best,
-                thin=thin)
+            result = {"predictive_mean": None,
+                      "predictive_std": None,
+                      "found": False,
+                      'prob_gt_ybest_xlast': 0,
+                      "terminate": False}
         else:
-            prob_gt_ybest_xlast = \
-                self.model.posterior_mean_prob_x_greater_than(self.xlim,
-                                                              y_best,
-                                                              thin=thin)
-
-        print "P(y > y_best) = {}".format(prob_gt_ybest_xlast)
-
-        result = self.predict(thin=thin)
-        predictive_mean = result['predictive_mean']
-        predictive_std = result['predictive_std']
-        found = result['found']
-
-        if prob_gt_ybest_xlast < threshold:
-            # Below the threshold. Send the termination signals
-            if self.predictive_std_threshold is None:
-                return {'predictive_mean': predictive_mean,
-                        'predictive_std': predictive_std,
-                        'found': found,
-                        'prob_gt_ybest_xlast': prob_gt_ybest_xlast,
-                        'terminate': found}
+            y_curr_best = np.max(y_list)
+            if y_curr_best > y_best:
+                print "Already exceeding best. Proceed"
+                result = {"predictive_mean": y_curr_best,
+                          "predictive_std": 0,
+                          "found": True,
+                          'prob_gt_ybest_xlast': 0,
+                          "terminate": False}
             else:
-                print "std_predictive_threshold is set. \
-                    Checking the predictive_std first"
-                print "predictive_std: {}".format(predictive_std)
-                if predictive_std < self.predictive_std_threshold:
-                    print "Predicting"
-                    return {'predictive_mean': predictive_mean,
-                            'predictive_std': predictive_std,
-                            'found': found,
-                            'prob_gt_ybest_xlast': prob_gt_ybest_xlast,
-                            'terminate': found}
+                y = cut_beginning(y_list)
+                x = np.asarray(range(1, len(y) + 1))
+                result = None
+                if not self.model.fit(x, y):
+                    print 'Failed in fitting, Let the training proceed in any \
+                        case'
+                    result = {'predictive_mean': y_curr_best,
+                              'predictive_std': 0,
+                              'found': False,
+                              'prob_gt_ybest_xlast': 0,
+                              'terminate': False}
                 else:
-                    print "Continue Trainng"
-                    return {'predictive_mean': result['predict'],
-                            'predictive_std': predictive_std,
-                            'found': found,
-                            'prob_gt_ybest_xlast': prob_gt_ybest_xlast,
-                            'terminate': False}
-        else:
-            print "Continue Training"
-            return {'predictive_mean': predictive_mean,
-                    'predictive_std': predictive_std,
-                    'found': found,
-                    'prob_gt_ybest_xlast': prob_gt_ybest_xlast,
-                    'terminate': False}
+                    if self.prob_x_greater_type == \
+                            'posterior_prob_x_greater_than':
+                        prob_gt_ybest_xlast = \
+                            self.model.posterior_prob_x_greater_than(
+                                self.xlim,
+                                y_best,
+                                thin=thin)
+                    else:
+                        prob_gt_ybest_xlast = \
+                            self.model.posterior_mean_prob_x_greater_than(
+                                self.xlim,
+                                y_best,
+                                thin=thin)
+
+                    print "P(y > y_best) = {}".format(prob_gt_ybest_xlast)
+
+                    res = self.predict(thin=thin)
+                    predictive_mean = res['predictive_mean']
+                    predictive_std = res['predictive_std']
+                    found = res['found']
+
+                    if prob_gt_ybest_xlast < threshold:
+                        # Below the threshold. Send the termination signals
+                        if self.predictive_std_threshold is None:
+                            result = {'predictive_mean': predictive_mean,
+                                      'predictive_std': predictive_std,
+                                      'found': found,
+                                      'prob_gt_ybest_xlast':
+                                          prob_gt_ybest_xlast,
+                                      'terminate': found}
+                        else:
+                            print "std_predictive_threshold is set. \
+                                Checking the predictive_std first"
+                            print "predictive_std: {}".format(predictive_std)
+                            if predictive_std < self.predictive_std_threshold:
+                                print "Predicting"
+                                result = {'predictive_mean': predictive_mean,
+                                          'predictive_std': predictive_std,
+                                          'found': found,
+                                          'prob_gt_ybest_xlast':
+                                              prob_gt_ybest_xlast,
+                                          'terminate': found}
+                            else:
+                                print "Continue Trainng"
+                                result = {'predictive_mean': predictive_mean,
+                                          'predictive_std': predictive_std,
+                                          'found': found,
+                                          'prob_gt_ybest_xlast':
+                                              prob_gt_ybest_xlast,
+                                          'terminate': False}
+                    else:
+                        print "Continue Training"
+                        result = {'predictive_mean': predictive_mean,
+                                  'predictive_std': predictive_std,
+                                  'found': found,
+                                  'prob_gt_ybest_xlast': prob_gt_ybest_xlast,
+                                  'terminate': False}
+
+        return result
 
 # class TerminationCriterion(object):
 #     def __init__(self, nthreads, prob_x_greater_type):
@@ -512,68 +683,70 @@ class ConservativeTerminationCriterion(TerminationCriterion):
 #                 ... continue"
 #             return 0
 
-def main(mode="conservative",
-         prob_x_greater_type="posterior_prob_x_greater_than",
-         nthreads=NTHREADS,
-         predictive_std_threshold=None):
-    ret = 0
-    try:
-        open("termination_criterion_running_pid", "w").write(str(os.getpid()))
+# def main(mode="conservative",
+#          prob_x_greater_type="posterior_prob_x_greater_than",
+#          nthreads=NTHREADS,
+#          predictive_std_threshold=None):
+#     ret = 0
+#     try:
+#         open("termination_criterion_running_pid", "w").write(
+#             str(os.getpid()))
 
-        assert prob_x_greater_type in ["posterior_mean_prob_x_greater_than",
-                                       "posterior_prob_x_greater_than"], \
-            ("prob_x_greater_type unkown %s"
-             % prob_x_greater_type)
+#         assert prob_x_greater_type in ["posterior_mean_prob_x_greater_than",
+#                                        "posterior_prob_x_greater_than"], \
+#             ("prob_x_greater_type unkown %s"
+#              % prob_x_greater_type)
 
-        # ret = run_prediction(nthreads)
-        # return ret
-        if mode == "conservative":
-            term_crit = ConservativeTerminationCriterion(
-                nthreads,
-                prob_x_greater_type,
-                predictive_std_threshold=predictive_std_threshold)
-            ret = term_crit.run()
-        elif mode == "optimistic":
-            term_crit = OptimisticTerminationCriterion(
-                nthreads,
-                prob_x_greater_type,
-                predictive_std_threshold=predictive_std_threshold)
-            ret = term_crit.run()
-        else:
-            print "The mode can either be conservative or optimistic"
-            ret = 0
-    except Exception as e:
-        import traceback
-        with open("term_crit_error.txt", "a") as error_log:
-            error_log.write(str(traceback.format_exc()))
-            error_log.write(str(e))
-    finally:
-        if os.path.exists("termination_criterion_running"):
-            os.remove("termination_criterion_running")
-        if os.path.exists("termination_criterion_running_pid"):
-            os.remove("termination_criterion_running_pid")
-    return ret
+#         # ret = run_prediction(nthreads)
+#         # return ret
+#         if mode == "conservative":
+#             term_crit = ConservativeTerminationCriterion(
+#                 nthreads,
+#                 prob_x_greater_type,
+#                 predictive_std_threshold=predictive_std_threshold)
+#             ret = term_crit.run()
+#         elif mode == "optimistic":
+#             term_crit = OptimisticTerminationCriterion(
+#                 nthreads,
+#                 prob_x_greater_type,
+#                 predictive_std_threshold=predictive_std_threshold)
+#             ret = term_crit.run()
+#         else:
+#             print "The mode can either be conservative or optimistic"
+#             ret = 0
+#     except Exception as e:
+#         import traceback
+#         with open("term_crit_error.txt", "a") as error_log:
+#             error_log.write(str(traceback.format_exc()))
+#             error_log.write(str(e))
+#     finally:
+#         if os.path.exists("termination_criterion_running"):
+#             os.remove("termination_criterion_running")
+#         if os.path.exists("termination_criterion_running_pid"):
+#             os.remove("termination_criterion_running_pid")
+#     return ret
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Termination criterion.')
-    parser.add_argument('--nthreads', type=int, default=1,
-                        help='number of threads to launch')
-    parser.add_argument('--mode', type=str, default="conservative",
-                        help='either conservative or optimistic')
-    parser.add_argument('--prob-x-greater-type', type=str,
-                        default="posterior_prob_x_greater_than",
-                        help='either posterior_mean_prob_x_greater_than or \
-                            posterior_prob_x_greater_than')
-    parser.add_argument('--predictive-std-threshold', type=float, default=None,
-                        help='threshold for making optimistic guesses about \
-                            the learning curve.')
+# if __name__ == "__main__":
+#     parser = argparse.ArgumentParser(description='Termination criterion.')
+#     parser.add_argument('--nthreads', type=int, default=1,
+#                         help='number of threads to launch')
+#     parser.add_argument('--mode', type=str, default="conservative",
+#                         help='either conservative or optimistic')
+#     parser.add_argument('--prob-x-greater-type', type=str,
+#                         default="posterior_prob_x_greater_than",
+#                         help='either posterior_mean_prob_x_greater_than or \
+#                             posterior_prob_x_greater_than')
+#     parser.add_argument('--predictive-std-threshold', type=float,
+#                         default=None,
+#                         help='threshold for making optimistic guesses about \
+#                             the learning curve.')
 
-    args = parser.parse_args()
+#     args = parser.parse_args()
 
-    ret = main(mode=args.mode,
-               prob_x_greater_type=args.prob_x_greater_type,
-               nthreads=args.nthreads,
-               predictive_std_threshold=args.predictive_std_threshold)
+#     ret = main(mode=args.mode,
+#                prob_x_greater_type=args.prob_x_greater_type,
+#                nthreads=args.nthreads,
+#                predictive_std_threshold=args.predictive_std_threshold)
 
-    print "exiting with status: %d" % ret
-    sys.exit(ret)
+#     print "exiting with status: %d" % ret
+#     sys.exit(ret)
