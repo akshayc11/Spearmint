@@ -60,7 +60,7 @@ class CurveModel(object):
             if default_param_name == "sigma":
                 continue
             msg = "function %s doesn't take default param %s" \
-                % (function.__name, default_param_name)
+                % (function.__name__, default_param_name)
             assert default_param_name in function_args, msg
         self.function_params = [param for param in function_args
                                 if param != 'x']

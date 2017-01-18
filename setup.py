@@ -21,6 +21,7 @@ setup(
               'spearmint.kernels',
               'spearmint.models',
               'spearmint.resources',
+              'spearmint.pylrpredictor',
               'spearmint.sampling',
               'spearmint.schedulers',
               'spearmint.tasks',

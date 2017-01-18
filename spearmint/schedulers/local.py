@@ -345,3 +345,64 @@ class LocalScheduler(AbstractScheduler):
             # sys.stderr.write("Submitted job as process: %d\n" % process.pid)
 
         return process.pid
+
+    def submit_elc(self, job_id, experiment_name, experiment_dir,
+                   database_address, mode, prob_x_greater_type, threshold,
+                   predictive_std_threshold, nthreads, xlim):
+        """Submit an ELC job for a given job_id.
+
+        Submit a job to extrapolate the learning curves for a given job-id.
+
+        Arguments:
+            job_id {[type]} -- [description]
+            experiment_name {[type]} -- [description]
+            experiment_dir {[type]} -- [description]
+            database_address {[type]} -- [description]
+            mode {[type]} -- [description]
+            prob_x_greater_type {[type]} -- [description]
+            threshold {[type]} -- [description]
+            predictive_std_threshold {[type]} -- [description]
+            nthreads {[type]} -- [description]
+            xlim {[type]} -- [description]
+
+        Returns:
+            [type] -- [description]
+        """
+
+        base_path = os.path.dirname(os.path.realpath(spearmint.__file__))
+        cmd = ('python {}/launcher.py --database-address {} \
+            --experiment-name {} --job-id {} --elc True --mode {} \
+            --prob-x-greater-type {} --threshold {} \
+            --predictive-std-threshold {} --nthreads {} --xlim {}'.format(
+            base_path, database_address, experiment_name, job_id,
+            mode, prob_x_greater_type, threshold, predictive_std_threshold,
+            nthreads, xlim))
+
+        output_directory = os.path.join(experiment_dir, 'output')
+        if not os.path.isdir(output_directory):
+            os.mkdir(output_directory)
+
+        # allow the user to specify a subdirectory for the output
+        if "output-subdir" in self.options:
+            output_directory = os.path.join(output_directory,
+                                            self.options['output-subdir'])
+            if not os.path.isdir(output_directory):
+                os.mkdir(output_directory)
+
+        output_filename = os.path.join(output_directory,
+                                       '%08d-elc.out' % job_id)
+        output_file = open(output_filename, 'w')
+
+        process = subprocess.Popen(cmd, stdout=output_file,
+                                   stderr=output_file,
+                                   shell=True)
+
+        process.poll()
+        if process.returncode is not None and process.returncode < 0:
+            sys.stderr.write("Failed to submit job or job crashed "
+                             "with return code %d !\n" % process.returncode)
+            return None
+        # else:
+            # sys.stderr.write("Submitted job as process: %d\n" % process.pid)
+
+        return process.pid

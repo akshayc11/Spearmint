@@ -190,6 +190,8 @@ import time
 import numpy as np
 
 from spearmint.utils.database.mongodb import MongoDB
+from spearmint.pylrpredictor.terminationcriterion import \
+    ConservativeTerminationCriterion, OptimisticTerminationCriterion
 
 
 def main():
@@ -212,18 +214,57 @@ def main():
                             job',
                         type=bool,
                         default=False)
+    parser.add_argument('--elc',
+                        help='Specify true to submit ELC job',
+                        type=bool,
+                        default=False)
+    parser.add_argument('--mode',
+                        help='Specify mode for termination criterion',
+                        type=str,
+                        default='conservative')
+    parser.add_argument('--prob-x-greater-type',
+                        help='type of probability sampling',
+                        type=str,
+                        default='posterior_prob_mean_x_greater_than')
+    parser.add_argument('--threshold',
+                        help='probability threshold for ELC',
+                        type=float,
+                        default=0.05)
+    parser.add_argument('--predictive-std-threshold',
+                        help='threshold for std dev of prediction',
+                        type=float,
+                        default=0.005)
+    parser.add_argument('--nthreads',
+                        help='number of threads for MCMC',
+                        type=int,
+                        default=4)
+    parser.add_argument('--xlim',
+                        help='total number of validation runs permitted',
+                        type=int,
+                        default=None)
+
     options = parser.parse_args()
 
-    launch(options.db_address, options.experiment_name, options.job_id,
-           options.validation)
+    launch(options)
 
 
-def launch(db_address, experiment_name, job_id, validation=False):
+def launch(options):
     """
     Launches a job from on a given id.
     """
+    db_address = options.db_address
+    experiment_name = options.experiment_name
+    job_id = options.job_id
+    validation = options.validation
+    elc = options.elc
+    mode = options.mode
+    prob_x_greater_type = options.prob_x_greater_type
+    threshold = options.threshold
+    predictive_std_threshold = options.predictive_std_threshold
+    nthreads = options.nthreads
+    xlim = options.xlim
 
-    if validation is False:
+    if validation is False and elc is False:
         db = MongoDB(database_address=db_address)
         job = db.load(experiment_name, 'jobs', {'id': job_id})
         # We want to launch this job.
@@ -296,7 +337,8 @@ def launch(db_address, experiment_name, job_id, validation=False):
             job['end time'] = end_time
 
         db.save(job, experiment_name, 'jobs', {'id': job_id})
-    else:
+        return
+    elif validation is True and elc is False:
         db = MongoDB(database_address=db_address)
         job = db.load(experiment_name, 'jobs', {'id': job_id})
         success = False
@@ -326,6 +368,43 @@ def launch(db_address, experiment_name, job_id, validation=False):
             sys.stderr.write("Failed to get validation results for job %d.\n"
                              % job_id)
         db.save(job, experiment_name, 'jobs', {'id': job_id})
+        return
+    elif validation is False and elc is True:
+        db = MongoDB(database_address=db_address)
+        job = db.load(experiment_name, 'jobs', {'id': job_id})
+        success = False
+        try:
+            if job['language'].lower() == 'python':
+                ret_dict = python_elc(job,
+                                      mode,
+                                      prob_x_greater_type,
+                                      threshold,
+                                      predictive_std_threshold,
+                                      nthreads,
+                                      xlim)
+                job['elc_result'] = ret_dict
+                job['elc_status'] = 'complete'
+                db.save(job, experiment_name, 'jobs', {'id': job_id})
+                success = True
+            else:
+                raise Exception("Not implemented for this language")
+        except:
+            import traceback
+            traceback.print_exc()
+            sys.stderr.write("Problem getting extrapolation running\n")
+            print sys.exc_info()
+            job['elc_status'] = 'broken'
+        if success:
+            sys.stderr.write(
+                "Completed getting extrapolation for job %d.\n" % job_id)
+        else:
+            sys.stderr.write("Failed to get extrapolation for job %d.\n"
+                             % job_id)
+        db.save(job, experiment_name, 'jobs', {'id': job_id})
+
+    else:
+        sys.stderr.write("Error: both validation and ELC specified as true.\n")
+        return
 
 
 def python_launcher(job):
@@ -427,6 +506,24 @@ def python_validation_accs(job):
     sys.stderr.write("Got result: {}.\n".format(validation_accs))
     # TODO: check if the results are a numpy array
     return validation_accs
+
+
+def python_elc(job, mode, prob_x_greater_type, threshold,
+               predictive_std_threshold, nthreads, xlim):
+    if mode == 'conservative':
+        term_crit = ConservativeTerminationCriterion(
+            xlim, nthreads, prob_x_greater_type,
+            predictive_std_threshold=predictive_std_threshold)
+    elif mode == 'optimistic':
+        term_crit = OptimisticTerminationCriterion(
+            xlim, nthreads, prob_x_greater_type,
+            predictive_std_threshold=predictive_std_threshold)
+    else:
+        raise Exception("Invalid mode for ELC")
+    y_list = job['validation_accs']
+    y_best = job['y_best']
+    result = term_crit.run(y_list, y_best, threshold=threshold)
+    return result
 
 
 # # BROKEN

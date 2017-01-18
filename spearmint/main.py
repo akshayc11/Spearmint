@@ -200,6 +200,7 @@ except ImportError:
 
 from spearmint.resources.resource import parse_resources_from_config
 from spearmint.resources.resource import print_resources_status
+from spearmint.resources.elc_resource import parse_elc_resource_from_config
 from spearmint.tasks.task_group import TaskGroup
 from spearmint.utils.database.mongodb import MongoDB
 
@@ -279,6 +280,9 @@ def main():
     db_address = options['database']['address']
     sys.stderr.write('Using database at %s.\n' % db_address)
     db = MongoDB(database_address=db_address)
+    validation_check_time = options.get('validation-check-time', 100000)
+    if options['validation-check'] is True:
+        elc_resource = parse_elc_resource_from_config(options)
     while True:
 
         for resource_name, resource in resources.iteritems():
@@ -315,7 +319,7 @@ def main():
                                                        suggested_job,
                                                        db_address,
                                                        expt_dir)
-
+                print process_id
                 # Set the status of the job appropriately (successfully
                 # submitted or not)
                 if process_id is None:
@@ -339,21 +343,81 @@ def main():
         if tired(db, experiment_name, resources):
             time.sleep(options.get('polling-time', 5))
 
-        if options.get('validation-check', True) is True:
-            print "Checking Validation"
+        if options.get('validation-check', False) is True:
+            # print "Checking Validation"
             # get list of all pending jobs
-            pending_jobs = [job for job in jobs if job['status'] == 'pending']
-            time.sleep(options.get('validation-check-time', 5))
+            curr_time = time.time()
+            # if curr_time - validation_check_start > validation_check_time:
+            pending_jobs = [job for job in jobs
+                            if job['status'] == 'pending' and
+                            job['elc_status'] not in ['pending']]
             for job in pending_jobs:
-                process_id = resource.attempt_dispatch_validation(
-                    experiment_name,
-                    job, db_address, expt_dir)
+                time_last_checked = job['validation check time']
+                if curr_time - time_last_checked > validation_check_time:
+                    # print 'dispatch validation for job {}'.format(
+                    #     job['id'])
+                    process_id = resource.attempt_dispatch_validation(
+                        experiment_name,
+                        job, db_address, expt_dir)
+                    j_id = job['id']
+                    job = db.load(experiment_name, 'jobs', {'id': j_id})
+                    job['validation check time'] = time.time()
+                    save_job(job, db, experiment_name)
+
             jobs = load_jobs(db, experiment_name)
-            pending_jobs = [job for job in jobs if job['status'] == 'pending']
+            pending_jobs = [temp_job for temp_job in jobs
+                            if temp_job['status'] == 'pending']
             for job in pending_jobs:
                 if job['validation_updated'] is True:
+                    sys.stderr.write('Updated Validation for job: {}\n'.format(job['id']))
+                    print job['validation_accs']
+                    j_id = job['id']
+                    job = db.load(experiment_name, 'jobs', {'id': j_id})
                     job['validation_updated'] = False
+                    # TODO: get the best available validation so far:
+                    # Assumption: the first task is the one we expect to run
+                    # elc on
+                    job['y_best'] = get_ybest(db, experiment_name,
+                                              task_name=job['tasks'][0])
                     save_job(job, db, experiment_name)
+                    # TODO: dispatch the elc job
+                    if job['elc_status'] in ['pending']:
+                        # TODO: Kill existing elc
+                        elc_resource.kill_job_elc(job)
+                    sys.stderr.write("Attempting to dispatch elc job\n")
+                    process_id = elc_resource.attempt_dispatch(experiment_name,
+                                                               job,
+                                                               db_address,
+                                                               expt_dir)
+                    job = db.load(experiment_name, 'jobs', {'id': j_id})
+                    if process_id is None:
+                        job['elc_status'] = 'broken'
+                    else:
+                        job['elc_status'] = 'pending'
+                        job['elc_proc_id'] = process_id
+                    save_job(job, db, experiment_name)
+
+            jobs = load_jobs(db, experiment_name)
+            # process unprocessed jobs whos elc check has been complete
+            # Any pending job whos elc_status is broken will be allowed to
+            # continue
+            pending_jobs = [temp_job for temp_job in jobs
+                            if temp_job['status'] in 'new' or 'pending']
+            unprocessed_jobs = [temp_job for temp_job in pending_jobs
+                                if temp_job['elc_status'] == 'complete']
+            # PROBLEM: if we have multiple tasks, I cannot simply kill. I will
+            # need to populate the results for all the tasks.
+            # Applicable in constrained tasks
+            for job in unprocessed_jobs:
+                elc_ret = job['elc_result']
+                if elc_ret['terminate'] is True:
+                    job['values'] = 1.0 - elc_ret['predictive_mean']
+                    job['std_dev'] = elc_ret['predictive_std']
+                    resource.kill_job(job)
+                    job['status'] = 'killed'
+                    job['proc_id'] = None
+                job['elc_status'] = 'processed'
+                save_job(job, db, experiment_name)
 
         if done(db, experiment_name, resources):
             return
@@ -362,6 +426,24 @@ def main():
             # if num_jobs >= options["max-finished-jobs"]:
             #     done = True
             #     return
+
+
+def get_ybest(db, experiment_name, task_name=None):
+    jobs = load_jobs(db, experiment_name)
+    completed_jobs = [job for job in jobs if job['status'] == 'complete']
+    results = [job['values'] for job in completed_jobs]
+    if len(results) == 0:
+        return -np.inf
+    else:
+        from pprint import pprint
+        if isinstance(results[0], dict):
+            assert task_name is not None, 'dict type results require task'
+            task_results = [result[task_name] for result in results]
+            best_result = np.min(task_results)
+        else:
+            best_result = np.min(results)
+        sys.stderr.write("Best result till now is {}.\n".format(best_result))
+        return 1.0 - best_result
 
 
 def tired(db, experiment_name, resources):
@@ -466,10 +548,15 @@ def get_suggestion(chooser, task_names, db, expt_dir, options, resource_name):
         'end time': None,
         'validation_accs': np.array([]),
         'validation_updated': False,
+        'validation check time': time.time(),
+        'y_best': None,
+        'elc_result': None,
+        'elc_status': None,
+        'elc_proc_id': None,
     }
 
     save_job(job, db, experiment_name)
-
+    jobs = load_jobs(db, experiment_name)
     return job
 
 
@@ -498,6 +585,7 @@ def load_jobs(db, experiment_name):
         jobs = [jobs]
 
     return jobs
+
 
 
 def save_job(job, db, experiment_name):

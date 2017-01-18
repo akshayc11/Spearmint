@@ -218,3 +218,8 @@ class AbstractScheduler(object):
         has been updated.
         '''
         pass
+
+    @abstractmethod
+    def submit_elc(self, job_id, experiment_name, experiment_dir,
+                   database_address):
+        pass
