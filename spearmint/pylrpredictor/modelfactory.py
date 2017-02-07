@@ -6,6 +6,7 @@ from curvefunctions import curve_ensemble_models, model_defaults
 from curvemodels import LinearCurveModel, MLCurveModel
 from curvemodels import MCMCCurveModelCombination
 
+
 from ensemblecurvemodel import CurveEnsemble, CurveModelEnsemble
 
 from mcmcmodelplotter import CurveModelEnsemblePlotter

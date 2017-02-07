@@ -280,6 +280,8 @@ def main():
     db_address = options['database']['address']
     sys.stderr.write('Using database at %s.\n' % db_address)
     db = MongoDB(database_address=db_address)
+    if tired(db, experiment_name, resources):
+        raise Exception('Resource seems to be tired even before beginning')
     validation_check_time = options.get('validation-check-time', 100000)
     if options['validation-check'] is True:
         elc_resource = parse_elc_resource_from_config(options)
@@ -381,8 +383,8 @@ def main():
                                               task_name=job['tasks'][0])
                     save_job(job, db, experiment_name)
                     # TODO: dispatch the elc job
-                    if job['elc_status'] in ['pending']:
-                        # TODO: Kill existing elc
+                    if job['elc_status'] in ['new', 'pending']:
+                        # Kill existing elc
                         elc_resource.kill_job_elc(job)
                     sys.stderr.write("Attempting to dispatch elc job\n")
                     process_id = elc_resource.attempt_dispatch(experiment_name,
@@ -411,11 +413,17 @@ def main():
             for job in unprocessed_jobs:
                 elc_ret = job['elc_result']
                 if elc_ret['terminate'] is True:
+                    sys.stderr.write('Extrapolation wants to terminate job {}.\n'.format(job['id']))
                     job['values'] = 1.0 - elc_ret['predictive_mean']
                     job['std_dev'] = elc_ret['predictive_std']
-                    resource.kill_job(job)
+                    killed = resource.kill_job(job)
+                    if killed is True:
+                        assert not resource.is_job_alive(job), "Job {} was supposed to be killed".format(job['id'])
+                        sys.stderr.write('Job [{}] killed'.format(job['proc_id']))
                     job['status'] = 'killed'
                     job['proc_id'] = None
+                else:
+                    sys.stderr.write('Extrapolation allowing the job {} to proceed.\n'.format(job['id']))
                 job['elc_status'] = 'processed'
                 save_job(job, db, experiment_name)
 

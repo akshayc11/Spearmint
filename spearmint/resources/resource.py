@@ -338,7 +338,7 @@ class Resource(object):
     def num_complete(self, jobs):
         jobs = self.filter_my_jobs(jobs)
         if jobs:
-            completed_jobs = map(lambda x: x['status'] == 'complete', jobs)
+            completed_jobs = map(lambda x: x['status'] in ['complete','killed'], jobs)
             return reduce(add, completed_jobs, 0)
         else:
             return 0
@@ -432,6 +432,7 @@ class Resource(object):
     def kill_job(self, job):
         """Kill a particular job
         """
+        sys.stderr.write("Resource {} trying to kill job {}.\n".format(self.name, job['id']))
         if job['resource'] != self.name:
             raise Exception("This job does not belong to me!")
         return self.scheduler.kill(job['proc_id'])

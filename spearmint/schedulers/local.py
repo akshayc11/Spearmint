@@ -288,10 +288,16 @@ class LocalScheduler(AbstractScheduler):
         """
         try:
             os.kill(process_id, signal.SIGTERM)
-            return True
         except OSError:
             # Job is no longer running
             return False
+        # This should have terminated the job.
+        try:
+            os.kill(process_id, 0)
+            return False
+        except:
+            print "Job terminated"
+            return True
         else:
             return True
 

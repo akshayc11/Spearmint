@@ -736,7 +736,7 @@ class MCMCCurveModelCombination(object):
         # larger than 1.0
         # and this is alright, because in those cases we don't necessarily want
         # to stop a run.
-        if not np.isfinite(ylim) or ylim < 0. or ylim > 100.0:
+        if not np.isfinite(ylim) or ylim < 0. or ylim > 1.0:
             return False
         else:
             return True
@@ -752,7 +752,7 @@ class MCMCCurveModelCombination(object):
                 ylim = model.predict(self.xlim)
                 if not self.y_lim_sanity_check(ylim):
                     print "ML fit of model %s is out of bound range \
-                        [0.0, 100.] at xlim." % (model.function.__name__)
+                        [0.0, 1.0] at xlim." % (model.function.__name__)
                     continue
                 params, sigma = model.split_theta_to_array(model.ml_params)
                 if not np.isfinite(self.ln_model_prior(model, params)):
