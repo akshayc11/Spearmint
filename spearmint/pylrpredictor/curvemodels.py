@@ -37,6 +37,7 @@ class CurveModel(object):
 
     def __init__(self,
                  function,
+                 const_params,
                  function_der=None,
                  min_vals={},
                  max_vals={},
@@ -50,6 +51,7 @@ class CurveModel(object):
             raise NotImplementedError("function derivate is not implemented \
                 yet...sorry!")
         self.function_der = function_der
+        self.const_params = const_params
         assert isinstance(min_vals, dict)
         self.min_vals = min_vals.copy()
         assert isinstance(max_vals, dict)
@@ -63,7 +65,7 @@ class CurveModel(object):
                 % (function.__name__, default_param_name)
             assert default_param_name in function_args, msg
         self.function_params = [param for param in function_args
-                                if param != 'x']
+                                if param != 'x' and param != 'const_params']
         # set default values:
         self.default_vals = default_vals.copy()
         for param_name in self.function_params:
@@ -132,7 +134,7 @@ class CurveModel(object):
             Make predictions given a single theta
         """
         params, sigma = self.split_theta(theta)
-        predictive_mu = self.function(x, **params)
+        predictive_mu = self.function(x, self.const_params, self.const_params, **params)
         return predictive_mu, sigma
 
     def likelihood(self, x, y):
@@ -141,9 +143,13 @@ class CurveModel(object):
                 p(y_i|x, model)
         """
         params, sigma = self.split_theta(self.ml_params)
-        return norm.pdf(y - self.function(x, **params), loc=0, scale=sigma)
+        return norm.pdf(y - self.function(x, self.const_params, **params), loc=0, scale=sigma)
 
-
+# class MLCurveModelWithRegularization(CurveModel):
+#     """
+#         ML Fit of a curve. Specifically applicable only to models with the const_params
+#         with f_prev component present, but whose parameters need to be
+#     """
 class MLCurveModel(CurveModel):
     """
         ML fit of a curve.
@@ -165,7 +171,7 @@ class MLCurveModel(CurveModel):
     def predict(self, x):
         # assert len(x.shape) == 1
         params, sigma = self.split_theta_to_array(self.ml_params)
-        return self.function(x, *params)
+        return self.function(x, self.const_params, *params)
         # return np.asarray([self.function(x_pred, **params) for x_pred in x])
 
     def fit_ml(self, x, y, weights, start_from_default):
@@ -190,19 +196,19 @@ class MLCurveModel(CurveModel):
         """
         if weights is None:
             if self.recency_weighting:
-                variance = np.average((y - self.function(x, *popt))**2,
+                variance = np.average((y - self.function(x, self.const_params, *popt))**2,
                                       weights=recency_weights(len(y)))
                 sigma = np.sqrt(variance)
             else:
-                sigma = (y - self.function(x, *popt)).std()
+                sigma = (y - self.function(x, self.const_params, *popt)).std()
         else:
             if self.recency_weighting:
                 variance = np.average(
-                    (y - self.function(x, *popt))**2,
+                    (y - self.function(x, self.const_params, *popt))**2,
                     weights=recency_weights(len(y)) * weights)
                 sigma = np.sqrt(variance)
             else:
-                variance = np.average((y - self.function(x, *popt))**2,
+                variance = np.average((y - self.function(x, self.const_params, *popt))**2,
                                       weights=weights)
                 sigma = np.sqrt(variance)
         return sigma
@@ -211,17 +217,17 @@ class MLCurveModel(CurveModel):
 
         def get_residuals_without_weights_with_recency_weighting(p):
             return np.sqrt(recency_weights(len(y))) * (
-                self.function(x, *p) - y)
+                self.function(x, self.const_params, *p) - y)
 
         def get_residuals_without_weights_without_recency_weighting(p):
-            return self.function(x, *p) - y
+            return self.function(x, self.const_params, *p) - y
 
         def get_residuals_with_weights_with_recency_weighting(p):
             return np.sqrt(recency_weights(len(y)) * weights) * (
-                self.function(x, *p) - y)
+                self.function(x, self.const_params, *p) - y)
 
         def get_residuals_with_weights_without_recency_weighting(p):
-            return np.sqrt(weights) * (self.function(x, *p) - y)
+            return np.sqrt(weights) * (self.function(x, self.const_params, *p) - y)
 
         try:
             if weights is None:
@@ -294,16 +300,16 @@ class MLCurveModel(CurveModel):
                 if weights is None:
                     if self.recency_weighting:
                         return np.sum(recency_weights(len(y)) * (
-                            self.function(x, *params) - y)**2)
+                            self.function(x, self.const_params, *params) - y)**2)
                     else:
-                        return np.sum((self.function(x, *params) - y)**2)
+                        return np.sum((self.function(x, self.const_params, *params) - y)**2)
                 else:
                     if self.recency_weighting:
                         return np.sum(weights * recency_weights(len(y)) * (
-                            self.function(x, *params) - y)**2)
+                            self.function(x, self.const_params, *params) - y)**2)
                     else:
                         return np.sum(weights * (
-                            self.function(x, *params) - y)**2)
+                            self.function(x, self.const_params, *params) - y)**2)
             bounds = []
             for param_name in self.function_params:
                 if param_name in self.min_vals and param_name in self.max_vals:
@@ -350,7 +356,7 @@ class MLCurveModel(CurveModel):
             http://en.wikipedia.org/wiki/Akaike_information_criterion
         """
         params, sigma = self.split_theta_to_array(self.ml_params)
-        y_model = self.function(x, *params)
+        y_model = self.function(x, self.const_params, *params)
         log_likelihood = norm.logpdf(y - y_model, loc=0, scale=sigma).sum()
         return 2 * len(self.function_params) - 2 * log_likelihood
 
@@ -364,6 +370,7 @@ class MCMCCurveModel(CurveModel):
     """
     def __init__(self,
                  function,
+                 const_params=None,
                  function_der=None,
                  min_vals={},
                  max_vals={},
@@ -379,12 +386,14 @@ class MCMCCurveModel(CurveModel):
         """
         super(MCMCCurveModel, self).__init__(
             function=function,
+            const_params=const_params,
             function_der=function_der,
             min_vals=min_vals,
             max_vals=max_vals,
             default_vals=default_vals)
         self.ml_curve_model = MLCurveModel(
             function=function,
+            const_params=const_params,
             function_der=function_der,
             min_vals=self.min_vals,
             max_vals=self.max_vals,
@@ -430,7 +439,7 @@ class MCMCCurveModel(CurveModel):
             with y_noise ~ N(0, sigma^2)
         """
         params, sigma = self.split_theta(theta)
-        y_model = self.function(x, **params)
+        y_model = self.function(x, self.const_params, **params)
         if self.recency_weighting:
             weight = recency_weights(len(y))
             ln_likelihood = (weight * norm.logpdf(y - y_model,
@@ -484,7 +493,7 @@ class MCMCCurveModel(CurveModel):
         predictions = []
         for theta in samples[::thin]:
             params, sigma = self.split_theta(theta)
-            predictions.append(self.function(x, **params))
+            predictions.append(self.function(x, self.const_params, **params))
         return np.asarray(predictions)
 
     def predictive_ln_prob_distribution(self, x, y, thin=1):
@@ -537,7 +546,7 @@ class MCMCCurveModel(CurveModel):
             P(f(x) > y | Data, theta)
         """
         params, sigma = self.split_theta(theta)
-        mu = self.function(x, **params)
+        mu = self.function(x, self.const_params, **params)
         cdf = norm.cdf(y, loc=mu, scale=sigma)
         return 1. - cdf
 
@@ -624,13 +633,13 @@ class LinearCurveModel(CurveModel):
         Fits a function f(x) = a * x + b using OLS.
     """
 
-    def __init__(self, *arg, **kwargs):
+    def __init__(self, const_params, *arg, **kwargs):
         if "default_vals" in kwargs:
             logging.warn("default values not needed for the linear model.")
         kwargs["default_vals"] = {"a": 0, "b": 0}
         kwargs["min_vals"] = {"a": 0}
         super(LinearCurveModel, self).__init__(
-            function=all_models["linear"], *arg, **kwargs)
+            function=all_models["linear"], const_params=const_params, *arg, **kwargs)
 
     def fit(self, x, y, weights=None, start_from_default=True):
         return self.fit_ml(x, y, weights)
@@ -647,7 +656,7 @@ class LinearCurveModel(CurveModel):
                     np.dot(x_array.T, y))
         a = bh[1]
         b = bh[0]
-        sigma = (y - self.function(x, a, b)).std()
+        sigma = (y - self.function(x, self.const_params, a, b)).std()
         self.ml_params = np.asarray([a, b, sigma])
         return True
 
@@ -662,6 +671,7 @@ class LinearMCMCCurveModel(MCMCCurveModel):
         ml_curve_model = LinearCurveModel()
         super(LinearMCMCCurveModel, self).__init__(
             function=ml_curve_model.function,
+            const_params=ml_curve_model.const_params,
             min_vals=ml_curve_model.min_vals,
             max_vals=ml_curve_model.max_vals,
             default_vals=ml_curve_model.default_vals,
@@ -880,17 +890,17 @@ class MCMCCurveModelCombination(object):
             # check for monotonicity(this obviously this is a hack,
             # but it works for now):
             x_mon = np.linspace(2, self.xlim, 100)
-            y_mon = model.function(x_mon, *params)
+            y_mon = model.function(x_mon, model.const_params, *params)
             if np.any(np.diff(y_mon) < 0):
                 return -np.inf
         elif self.soft_monotonicity_constraint:
             # soft monotonicity: defined as the last value being bigger
             # than the first one
             x_mon = np.asarray([2, self.xlim])
-            y_mon = model.function(x_mon, *params)
+            y_mon = model.function(x_mon, model.const_params, *params)
             if y_mon[0] > y_mon[-1]:
                 return -np.inf
-        ylim = model.function(self.xlim, *params)
+        ylim = model.function(self.xlim, model.const_params, *params)
         # sanity check for ylim
         if self.sanity_check_prior and not self.y_lim_sanity_check(ylim):
             return -np.inf
@@ -1024,7 +1034,7 @@ class MCMCCurveModelCombination(object):
         y_model = []
         for model, model_w, params in zip(self.fit_models, model_ws,
                                           model_params):
-            y_model.append(model_w * model.function(x, *params))
+            y_model.append(model_w * model.function(x, model.const_params, *params))
         y_predicted = reduce(lambda a, b: a + b, y_model)
         return y_predicted
 
@@ -1304,14 +1314,14 @@ class MCMCCurveMixtureModel(object):
             # but it works for now):
             x_mon = np.linspace(2, self.xlim, 100)
             params, sigma = model.split_theta_to_array(theta)
-            y_mon = model.function(x_mon, *params)
+            y_mon = model.function(x_mon, model.const_params, *params)
             if np.any(np.diff(y_mon) < 0):
                 return -np.inf
         elif self.soft_monotonicity_constraint:
             # soft monotonicity: defined as the last value being bigger than
             # the first one
             x_mon = np.asarray([2, self.xlim])
-            y_mon = model.function(x_mon, *params)
+            y_mon = model.function(x_mon, model.const_params, *params)
             if y_mon[0] > y_mon[-1]:
                 return -np.inf
         return 0.0
@@ -1336,7 +1346,7 @@ class MCMCCurveMixtureModel(object):
                                                     model_weights):
             ln_likelihood = np.log(model_weight)
             params, sigma = model.split_theta_to_array(model_theta)
-            y_model = model.function(x, *params)
+            y_model = model.function(x, model.const_params, *params)
             if sample_weights is None:
                 ln_likelihood += norm.logpdf(y - y_model,
                                              loc=0, scale=sigma).sum()
@@ -1460,7 +1470,7 @@ class MCMCCurveMixtureModel(object):
         for model, model_w, theta in zip(self.fit_models, model_ws,
                                          model_thetas):
             params, sigma = model.split_theta_to_array(theta)
-            y_model.append(model_w * model.function(x, *params))
+            y_model.append(model_w * model.function(x, model.const_params, *params))
         y_predicted = reduce(lambda a, b: a + b, y_model)
         return y_predicted
 

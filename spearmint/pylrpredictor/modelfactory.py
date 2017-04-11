@@ -1,6 +1,6 @@
 from multiprocessing import Pool
 
-from curvefunctions import all_models, curve_combination_models
+from curvefunctions import all_models, curve_combination_models, const_param_models_list
 from curvefunctions import curve_ensemble_models, model_defaults
 
 from curvemodels import LinearCurveModel, MLCurveModel
@@ -15,6 +15,8 @@ from mcmcmodelplotter import MCMCCurveModelCombinationPlotter
 
 def setup_model_combination(xlim,
                             models=curve_combination_models,
+                            const_param_list=None,
+                            const_param_models=const_param_models_list,
                             recency_weighting=False,
                             normalize_weights=True,
                             monotonicity_constraint=False,
@@ -35,6 +37,20 @@ def setup_model_combination(xlim,
                                  recency_weighting=recency_weighting)
         curve_models.append(m)
 
+    for const_params in const_param_list:
+        for model_name in const_param_models:
+            if model_name in model_defaults:
+                
+                m = MlCurveModel(function=all_models[model_name],
+                                 const_params=const_params,
+                                 default_vals=model_defaults[model_name],
+                                 recency_weighting=recency_weighting)
+            else:
+                m = MlCurveModel(function=all_models[model_name],
+                                 const_params=const_params, 
+                                 recency_weighting=recency_weighting)
+            curve_models.append(m)
+    
     model_combination = MCMCCurveModelCombination(
         curve_models,
         xlim=xlim,

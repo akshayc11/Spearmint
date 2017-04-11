@@ -192,7 +192,7 @@ import numpy as np
 from spearmint.utils.database.mongodb import MongoDB
 from spearmint.pylrpredictor.terminationcriterion import \
     ConservativeTerminationCriterion, OptimisticTerminationCriterion
-
+from spearmint.pylrpredictor.prevonlyterminationcriterion import ConservativeTerminationCriterion as GelcConservativeTerminationCriterion
 
 def main():
     parser = argparse.ArgumentParser(description="usage: %prog [options]")
@@ -525,7 +525,10 @@ def python_elc(job, mode, prob_x_greater_type, threshold,
     result = term_crit.run(y_list, y_best, threshold=threshold)
     return result
 
-
+def python_gelc(job, prev_jobs, mode, prob_x_greater_type, threshold, predictive_std_threshold, nthreads, xlim):
+    assert mode == 'conservative'
+    # Get the full jobs'
+    term_crit = GelcConservativeTerminationCriterion()
 # # BROKEN
 # def matlab_launcher(job):
 #     # Run it as a Matlab function.
