@@ -15,7 +15,7 @@ from mcmcmodelplotter import MCMCCurveModelCombinationPlotter
 
 def setup_model_combination(xlim,
                             models=curve_combination_models,
-                            const_param_list=None,
+                            const_param_list=[],
                             const_param_models=const_param_models_list,
                             recency_weighting=False,
                             normalize_weights=True,

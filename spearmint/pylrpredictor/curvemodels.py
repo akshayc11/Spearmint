@@ -37,7 +37,7 @@ class CurveModel(object):
 
     def __init__(self,
                  function,
-                 const_params,
+                 const_params=None,
                  function_der=None,
                  min_vals={},
                  max_vals={},
