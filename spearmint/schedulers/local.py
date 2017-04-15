@@ -186,7 +186,7 @@ import os
 import signal
 import subprocess
 import sys
-
+import psutil
 
 from abstract_scheduler import AbstractScheduler
 
@@ -286,20 +286,29 @@ class LocalScheduler(AbstractScheduler):
         Returns:
             bool -- true if killed, else false.
         """
-        try:
-            os.kill(process_id, signal.SIGTERM)
-        except OSError:
-            # Job is no longer running
-            return False
-        # This should have terminated the job.
-        try:
-            os.kill(process_id, 0)
-            return False
-        except:
-            print "Job terminated"
-            return True
+        if self.alive(process_id):
+
+            try:
+                p = psutil.Process(process_id)
+                for c in p.children(recursive=True):
+                    c.terminate()
+                p.terminate()
+                #os.kill(process_id, signal.SIGTERM)
+            except:
+                # Job is no longer running
+                return False
+            
+            # This should have terminated the job.
+            try:
+                os.kill(process_id, 0)
+                return False
+            except:
+                print "Job terminated"
+                return True
+            else:
+                return True
         else:
-            return True
+            return False
 
     def check_validation_accs(self, job_id, experiment_name, experiment_dir,
                               database_address):
@@ -354,7 +363,8 @@ class LocalScheduler(AbstractScheduler):
 
     def submit_elc(self, job_id, experiment_name, experiment_dir,
                    database_address, mode, prob_x_greater_type, threshold,
-                   predictive_std_threshold, nthreads, xlim):
+                   predictive_std_threshold, nthreads, xlim, min_y_prev=1,
+                   recency_weighting=False, monotonicity_condition=False):
         """Submit an ELC job for a given job_id.
 
         Submit a job to extrapolate the learning curves for a given job-id.
@@ -379,10 +389,12 @@ class LocalScheduler(AbstractScheduler):
         cmd = ('python {}/launcher.py --database-address {} \
             --experiment-name {} --job-id {} --elc True --mode {} \
             --prob-x-greater-type {} --threshold {} \
-            --predictive-std-threshold {} --nthreads {} --xlim {}'.format(
+            --predictive-std-threshold {} --nthreads {} --xlim {} \
+        --min-y-prev {} --recency-weighting {} --monotonicity-condition {}'.format(
             base_path, database_address, experiment_name, job_id,
             mode, prob_x_greater_type, threshold, predictive_std_threshold,
-            nthreads, xlim))
+            nthreads, xlim, min_y_prev,
+            recency_weighting, monotonicity_condition))
 
         output_directory = os.path.join(experiment_dir, 'output')
         if not os.path.isdir(output_directory):

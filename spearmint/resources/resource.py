@@ -422,7 +422,6 @@ class Resource(object):
         process_id = self.scheduler.check_validation_accs(
             job['id'],
             experiment_name, expt_dir, db_address)
-
         if process_id is None:
             sys.stderr.write('Failed to submit validation check for job %d.\n'
                              % job['id'])

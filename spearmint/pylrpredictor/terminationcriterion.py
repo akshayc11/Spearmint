@@ -83,7 +83,8 @@ class TerminationCriterion(object):
     xlim = None
     model = None
     has_fit = False
-    def __init__(self, xlim, nthreads, prob_x_greater_type,
+    y_curr=None
+    def __init__(self, y_curr, xlim, nthreads, prob_x_greater_type,
                  recency_weighting=True, models=None):
         """Constructor for TerminationCriterion class.
 
@@ -109,6 +110,7 @@ class TerminationCriterion(object):
         # Assumption: This is being run from the correct base folder of
         # operation.
         # """
+        self.y_curr = y_curr
         self.prob_x_greater_type = prob_x_greater_type
         sys.stderr.write('prob_x_greater_type:{}\n'.format(
             self.prob_x_greater_type))
@@ -135,7 +137,7 @@ class TerminationCriterion(object):
             nthreads=nthreads)
 
     @abstractmethod
-    def run(self, y_list, y_best, thin=PREDICTION_THINNING):
+    def run(self, y_best, thin=PREDICTION_THINNING):
         """The actual run function.
 
         Abstract method to run the termination criterion check.
@@ -225,7 +227,7 @@ class OptimisticTerminationCriterion(TerminationCriterion):
 
     predictive_std_threshold = None
 
-    def __init__(self, xlim, nthreads, prob_x_greater_type,
+    def __init__(self, y_curr, xlim, nthreads, prob_x_greater_type,
                  predictive_std_threshold=PREDICTIVE_STD_THRESHOLD,
                  models=None):
         """Constructor for OptimisticTerminiationCriterion.
@@ -247,10 +249,10 @@ class OptimisticTerminationCriterion(TerminationCriterion):
         assert predictive_std_threshold > 0
 
         super(OptimisticTerminationCriterion,
-              self).__init__(xlim, nthreads, prob_x_greater_type, models=models)
+              self).__init__(y_curr, xlim, nthreads, prob_x_greater_type, models=models)
         self.predictive_std_threshold = predictive_std_threshold
 
-    def run(self, y_list, y_best, thin=PREDICTION_THINNING,
+    def run(self, y_best, thin=PREDICTION_THINNING,
             threshold=IMPROVEMENT_PROB_THRESHOLD):
         """Run method for OptimisticTerminationCriterion class.
 
@@ -278,8 +280,8 @@ class OptimisticTerminationCriterion(TerminationCriterion):
         and based on the prediction from the extrapolation model, determines
         when to terminate.
         '''
-        print "List: ", y_list
-        if len(y_list) == 0:
+        sys.stderr.write("List: {}\n".format(self.y_curr))
+        if len(self.y_curr) == 0:
             sys.stderr.write("No y_s done yet\n")
             result = {"predictive_mean": None,
                       "predictive_std": None,
@@ -287,7 +289,7 @@ class OptimisticTerminationCriterion(TerminationCriterion):
                       'prob_gt_ybest_xlast': 0.0,
                       "terminate": False}
         else:
-            y_curr_best = np.max(y_list)
+            y_curr_best = np.max(y_curr)
             if y_curr_best > y_best:
                 sys.stderr.write("Already exceeding best. Proceed\n")
                 result = {"predictive_mean": y_curr_best,
@@ -296,7 +298,7 @@ class OptimisticTerminationCriterion(TerminationCriterion):
                           'prob_gt_ybest_xlast': 1.0,
                           "terminate": False}
             else:
-                y = y_list
+                y = self.y_curr
                 # y = cut_beginning(y_list)
                 x = np.asarray(range(1, len(y) + 1))
                 if not self.model.fit(x, y):
@@ -387,7 +389,7 @@ class ConservativeTerminationCriterion(TerminationCriterion):
 
     predictive_std_threshold = None
 
-    def __init__(self, xlim, nthreads, prob_x_greater_type,
+    def __init__(self, y_curr, xlim, nthreads, prob_x_greater_type,
                  predictive_std_threshold=None, models=None):
         """Constructor for the ConservativeTerminationCriterion class.
 
@@ -407,9 +409,9 @@ class ConservativeTerminationCriterion(TerminationCriterion):
         """
         self.predictive_std_threshold = predictive_std_threshold
         super(ConservativeTerminationCriterion,
-              self).__init__(xlim, nthreads, prob_x_greater_type, models=models)
+              self).__init__(y_curr, xlim, nthreads, prob_x_greater_type, models=models)
 
-    def run(self, y_list, y_best, thin=PREDICTION_THINNING,
+    def run(self, y_best, thin=PREDICTION_THINNING,
             threshold=IMPROVEMENT_PROB_THRESHOLD):
         """Run method for the ConservativeTerminationCriterion class.
 
@@ -432,8 +434,8 @@ class ConservativeTerminationCriterion(TerminationCriterion):
                       exceeding best available value so far, and decision to
                       terminate.
         """
-        print "List: ", y_list
-        if len(y_list) == 0:
+        print "List: ", self.y_curr
+        if len(self.y_curr) == 0:
             sys.stderr.write("No y_s done yet\n")
             result = {"predictive_mean": None,
                       "predictive_std": None,
@@ -441,7 +443,7 @@ class ConservativeTerminationCriterion(TerminationCriterion):
                       'prob_gt_ybest_xlast': 0,
                       "terminate": False}
         else:
-            y_curr_best = np.max(y_list)
+            y_curr_best = np.max(self.y_curr)
             if y_curr_best > y_best:
                 sys.stderr.write("Already exceeding best. Proceed\n")
                 result = {"predictive_mean": y_curr_best,
@@ -451,7 +453,7 @@ class ConservativeTerminationCriterion(TerminationCriterion):
                           "terminate": False}
             else:
                 #y = cut_beginning(y_list)
-                y = y_list
+                y = self.y_curr
                 x = np.asarray(range(1, len(y) + 1))
                 result = None
                 if not self.model.fit(x, y):

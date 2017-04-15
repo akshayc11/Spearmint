@@ -32,18 +32,25 @@ class TerminationCriterion(object):
     y_curr = None
     y_best = None
     a_b_losses = None
-
+    min_y_prev = None
+    recency_weighting = None
+    monotonicity_condition = None
     def __init__(self, y_curr, xlim, prob_x_greater_type=None,
-                 y_prev_list = [], n=100, predictive_std_threshold=PREDICTIVE_STD_THRESHOLD):
+                 y_prev_list=[], n=100, predictive_std_threshold=PREDICTIVE_STD_THRESHOLD,
+                 min_y_prev=1, recency_weighting=False, monotonicity_condition=True):
         """
         Constructor for the TerminationCriterion
         """
-
         self.prob_x_greater_type = prob_x_greater_type
         self.xlim = xlim
-        self.y_prev_list = y_prev_list
+        self.y_prev_list = [y for y in y_prev_list if len(y) == xlim]
+        print y_curr
+        print [len(y) for y in y_prev_list]
         self.a_b_losses = []
         self.predictive_std_threshold=predictive_std_threshold
+        self.min_y_prev = min_y_prev
+        self.recency_weighting = recency_weighting
+        self.monotonicity_condition = monotonicity_condition
         self.has_fit = self.fit(y_curr, n)
         
     def get_prediction(self, xlim=None, thin=None):
@@ -51,6 +58,8 @@ class TerminationCriterion(object):
     
     def fit(self, y_curr, n):
         self.y_curr = y_curr
+        if self.min_y_prev >= len(self.y_prev_list):
+            return False
         for y_idx in range(len(self.y_prev_list)):
             y_prev = self.y_prev_list[y_idx]
             a_b_losses = self.__get_gradients_and_losses(y_curr, y_prev, n=n)
@@ -104,7 +113,7 @@ class TerminationCriterion(object):
         else:
             predictive_mean = result['predictive_mean']
             predictive_std = result['predictive_std']
-            return norm.cdf(y_best, loc=predictive_mean, scale=predictive_std)
+            return 1.0 - norm.cdf(y_best, loc=predictive_mean, scale=predictive_std)
 
     @abstractmethod
     def run(self, y_best, thin=None):
@@ -126,90 +135,98 @@ class TerminationCriterion(object):
         min_len = min(len(f_cs), len(f_ps))
         f_c = f_cs[0:min_len]
         f_p = f_ps[0:min_len]
+        f_c_max = f_c[-1]
         a_b_losses = []
-        for i in xrange(n):
-            a_b_losses.append(gradient_descent(f_c, f_p, return_loss=True))
-        
+        for i in xrange(int(2*n)):
+            a_b_loss = gradient_descent(f_c, f_p, return_loss=True,
+                                        recency_weighting=self.recency_weighting)
+            if self.monotonicity_condition is True:
+                a,b,loss = a_b_loss
+                f_c_pred_fin = a * f_ps[-1] + b
+                # Dont allow any combination that produces predictions that are
+                # worse than best available result so far for current build
+                if f_c_pred_fin < f_c_max:
+                    # Discard this combination
+                    continue
+
+            a_b_losses.append(a_b_loss)
+            if len(a_b_losses) == n:
+                break
         return a_b_losses
 
 class ConservativeTerminationCriterion(TerminationCriterion):
 
     def __init__(self, y_curr, xlim, prob_x_greater_type=None,
-                 y_prev_list = [], n=100, predictive_std_threshold=PREDICTIVE_STD_THRESHOLD):
+                 y_prev_list = [], n=100,
+                 predictive_std_threshold=PREDICTIVE_STD_THRESHOLD,
+                 min_y_prev=1,
+                 recency_weighting=False,
+                 monotonicity_condition=True):
+        self.predictive_std_threshold = predictive_std_threshold
         super(ConservativeTerminationCriterion, self).__init__(
             y_curr, xlim, prob_x_greater_type,
-            y_prev_list=y_prev_list, n=n)
+            y_prev_list=y_prev_list, n=n, min_y_prev=min_y_prev,
+            recency_weighting=recency_weighting, monotonicity_condition=True)
     
     def run(self, y_best, threshold=IMPROVEMENT_PROB_THRESHOLD):
         """
         Run method for the conservative termination criterion
         """
-        if y_curr is None or len(y_curr)==0:
-            sys.stderr.write('No y_s done yet\n')
-            result = {'predictive_mean': None,
-                      'predictive_std': None,
-                      'found': False,
-                      'prob_gt_ybest_xlast': 0,
-                      'terminate': False}
+        predictive_mean = None
+        predictive_std = None
+        found = False
+        prob_gt_ybest_xlast = 0.0
+        terminate = False
+            
+        if self.y_curr is None or len(self.y_curr)==0:
+            sys.stderr.write('No y_s done yet, or not enough previous builds\n')
         else:
-            y_c_best = np.max(y_list)
-            if y_c_best > y_best:
+            y_c_best = np.max(self.y_curr)
+            if y_c_best >= y_best:
                 # let current build run to termination
                 sys.stderr.write('Already exceeding previous best. Proceed to termination\n')
-                result = {'predicitve_mean': y_c_best,
-                          'predictive_std': 0.0,
-                          'found': True,
-                          'prob_gt_ybest_xlast': 1.0,
-                          'terminate': False}
+                predictive_mean = y_c_best
+                predictive_std = 0.0
+                found = True
+                prob_gt_ybest_xlast = 1.0
+                terminate = False
             else:
                 if self.has_fit == False:
-                    sys.stderr.write('Failed in fitting. Let training proceed in any case.\n')
-                    result = {'predictive_mean': y_c_best,
-                              'predictive_std': 0.0,
-                              'found': False,
-                              'prob_gt_ybest_xlast': 0,
-                              'terminate': False}
+                    sys.stderr.write('Failed in fitting Or more builds need to be trained. Let training proceed in any case.\n')                    
                 else:
-                    prob_gt_ybest_xlast = self.posterior_prob_x_greater_than(self.xlim, y_best)
-                    sys.stderr.write('P(y>y_best) = {}\n'.format(prob_gt_ybest_xlast))
                     res = self.predict()
                     predictive_mean = res['predictive_mean']
                     predictive_std = res['predictive_std']
                     found = res['found']
-                    if prob_gt_ybest_xlast < threshold:
-                        if predictive_std_threshold is None:
-                            result = {'predictive_mean': predictive_mean,
-                                      'predictive_std': predictive_std,
-                                      'found': found,
-                                      'prob_gt_ybest_xlast':
-                                      prob_gt_ybest_xlast,
-                                      'terminate': found}
-                        else:
-                            sys.stderr.write("std_predictive_threshold is set. Checking the predictive_std first\n")
-                            sys.stderr.write("predictive_std: {}\n".format(
-                                predictive_std))
-                            if predictive_std < self.predictive_std_threshold:
-                                sys.stderr.write("Predicting")
-                                result = {'predictive_mean': predictive_mean,
-                                          'predictive_std': predictive_std,
-                                          'found': found,
-                                          'prob_gt_ybest_xlast':
-                                              prob_gt_ybest_xlast,
-                                          'terminate': found}
-                            else:
-                                print "Continue Trainng\n"
-                                result = {'predictive_mean': predictive_mean,
-                                          'predictive_std': predictive_std,
-                                          'found': found,
-                                          'prob_gt_ybest_xlast':
-                                              prob_gt_ybest_xlast,
-                                          'terminate': False}
+                    prob_gt_ybest_xlast = self.posterior_prob_x_greater_than(y_best, self.xlim)
+                    sys.stderr.write('P(y>y_best) = {}\n'.format(prob_gt_ybest_xlast))
+                    if found is False:
+                        sys.stderr.write("Prediction failed for some reason. Continue training\n")
+                        terminate = False
                     else:
-                        print "Continue Training\n"
-                        result = {'predictive_mean': predictive_mean,
-                                  'predictive_std': predictive_std,
-                                  'found': found,
-                                  'prob_gt_ybest_xlast': prob_gt_ybest_xlast,
-                                  'terminate': False}
+                        if prob_gt_ybest_xlast < threshold:
+                            # Probability of finding solution has fallen below a threshold
+                            if self.predictive_std_threshold is None:
+                                sys.stderr.write("no predictive_std_threshold given. Terminate\n")
+                                terminate = True
+                            else:
+                                sys.stderr.write("predictive_std_threshold is set: {}\n".format(predictive_std))
+                                if predictive_std < self.predictive_std_threshold:
+                                    # The std deviation of the prediction has also fallen
+                                    # below the threshold
+                                    sys.stderr.write("std threshold check failed. Terminate\n")
+                                    terminate = True
+                                else:
+                                    print "still above std threshold. Continue Training\n"
+                                    terminate = False
+                        else:
+                            print "Still above prediction threshold. Continue Training\n"
+                            terminate = False
+        
+        result = {'predictive_mean': predictive_mean,
+                  'predictive_std': predictive_std,
+                  'found': found,
+                  'prob_gt_ybest_xlast':prob_gt_ybest_xlast,
+                  'terminate': terminate}
         pprint(result)
         return result

@@ -27,20 +27,25 @@ def parse_elc_config(elc_resource_config=None):
 
     if 'name' not in elc_resource_config:
         elc_resource_config['name'] = 'Elc'
+    
     if 'scheduler' not in elc_resource_config:
         elc_resource_config['scheduler'] = 'local'
+    
     if 'elc_task_name' not in elc_resource_config:
         elc_resource_config['elc_task_name'] = 'Elc_Task'
+    
     if 'nthreads' not in elc_resource_config:
         elc_resource_config['nthreads'] = 4
     else:
         assert isinstance(elc_resource_config['nthreads'], int)
+    
     if 'mode' not in elc_resource_config:
         elc_resource_config['mode'] = 'conservative'
     else:
         assert elc_resource_config['mode'] == 'conservative' or \
-            elc_resource_config['mode'] == 'optimistic', 'mode should be \
-                conservative or optimistic'
+            elc_resource_config['mode'] == 'optimistic' or \
+            elc_resource_config['mode'] == 'gelc-conservative', 'mode should be \
+            conservative or optimistic'
 
     if 'prob_x_greater_type' not in elc_resource_config:
         elc_resource_config['prob_x_greater_type'] = \
@@ -52,12 +57,14 @@ def parse_elc_config(elc_resource_config=None):
             'posterior_prob_x_greater_than', 'prob_x_greater_type \
             should be posterior_mean_prob_x_greater_than or \
             posterior_prob_x_greater_than'
+    
     if 'threshold' not in elc_resource_config:
         elc_resource_config['threshold'] = 0.05
     else:
         assert elc_resource_config['threshold'] > .0 and \
             elc_resource_config['threshold'] < 1.0, 'threshold must be \
             between 0 and 1'
+    
     if 'predictive_std_threshold' not in elc_resource_config:
         elc_resource_config['predictive_std_threshold'] = 0.005
     else:
@@ -65,12 +72,24 @@ def parse_elc_config(elc_resource_config=None):
             elc_resource_config['predictive_std_threshold'] is None, '\
             predictive_std_threshold should be greater than 0.0 or specified \
             as None'
+    
     if 'scheduler' not in elc_resource_config:
         elc_resource_config['scheduler'] = 'local'
+    
     if 'xlim' not in elc_resource_config:
         raise Exception('xlim is a required parameter for the resource_config')
     else:
         assert elc_resource_config['xlim'] > 0
+
+    if 'min_y_prev' not in elc_resource_config:
+        elc_resource_config['min_y_prev'] = 1
+
+    if 'recency-weighting' not in elc_resource_config:
+        elc_resource_config['recency-weighting'] = False
+
+    if 'monotonicity-condition' not in elc_resource_config:
+        elc_resource_config['monotonicity-condition'] = False
+
     return elc_resource_config
 
 
@@ -104,6 +123,7 @@ def parse_elc_resource_from_config(config):
             elc_resource_name,
             task_names,
             elc_resource_config)
+
     return elc_resource
 
 
@@ -231,7 +251,7 @@ class ElcResource(object):
         return self.scheduler.alive(job['elc_proc_id'])
 
     def kill_elc(self, job):
-        if not self.is_elc_alive(job):
+        if self.is_elc_alive(job):
             self.scheduler.kill(job['elc_proc_id'])
 
     def attempt_dispatch(self, experiment_name, job, db_address, expt_dir):
@@ -255,7 +275,9 @@ class ElcResource(object):
         predictive_std_threshold = self.resource_config[
             'predictive_std_threshold']
         xlim = self.resource_config['xlim']
-
+        min_y_prev = self.resource_config['min_y_prev']
+        recency_weighting = self.resource_config['recency-weighting']
+        monotonicity_condition = self.resource_config['monotonicity-condition']
         process_id = self.scheduler.submit_elc(job['id'], experiment_name,
                                                expt_dir, db_address,
                                                mode,
@@ -263,7 +285,10 @@ class ElcResource(object):
                                                threshold,
                                                predictive_std_threshold,
                                                nthreads,
-                                               xlim)
+                                               xlim,
+                                               min_y_prev=min_y_prev,
+                                               recency_weighting=recency_weighting,
+                                               monotonicity_condition=monotonicity_condition)
         if process_id is not None:
             sys.stderr.write('Submitted elc job {} with {} scheduler. \
                              (process_id: {})\n'.format(job['id'],

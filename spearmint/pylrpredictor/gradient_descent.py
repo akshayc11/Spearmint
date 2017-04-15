@@ -4,6 +4,18 @@ import random
 import numpy as np
 import math
 
+def recency_weights(num):
+    # This function generates an exponential based recency weighting to add to the residuals.
+    # This is done so that the loss from fresher epochs are given more weightage than loss from 
+    # previous epochs
+    if num == 1:
+        return np.ones(1)
+    else:
+        recency_weights = [10**(1./num)] * num
+        recency_weights = recency_weights ** (np.arange(0, num))
+        return recency_weights
+    pass
+
 def gradient_descent(f_cs, f_ps,
                      alpha=0.01,
                      N=1000,
@@ -11,10 +23,23 @@ def gradient_descent(f_cs, f_ps,
                      lambda_2=100,
                      lambda_3=1,
                      lambda_4=1,
+                     lambda_5=5,
                      return_loss=False,
                      a_0=None,
-                     b_0=None):
-    
+                     b_0=None,
+                     recency_weighting=False,
+                     monotonicity_condition=False,
+                     f_c_max=None,
+                     f_p_max=None):
+    lambda_6=0
+    if monotonicity_condition is True:
+        assert f_c_max is not None and f_p_max is not None, "Need f_c_max and f_p_max to check monotonicity condition"
+        lambda_6=1
+    else:
+        f_c_max = 0
+        f_p_max = 0
+        lambda_5 = 0
+        lambda_6 = 0
     if a_0 is None:
         a = random.random()
     else:
@@ -25,13 +50,19 @@ def gradient_descent(f_cs, f_ps,
         b = b_0
     
     n = len(f_cs)
+    f_cap_cs = a * f_ps + b
     try:
         assert(len(f_cs) == len(f_ps))
         for i in xrange(N):
             f_cap_cs = a*f_ps + b
             residuals = f_cs - f_cap_cs
-            dL_da = -np.dot(residuals, f_ps)/n - (lambda_1 * lambda_2 * math.exp(-lambda_2 * a)) - (lambda_3 * (1.0 - a) / math.exp(lambda_4 * n))
-            dL_db = -np.sum(residuals)/n
+            if recency_weighting is True:
+                residuals = np.sqrt(recency_weights(n)) * residuals
+            
+            monotonicity_val = lambda_5*((a * f_p_max) + b - f_c_max)
+            
+            dL_da = -np.dot(residuals, f_ps)/n - (lambda_1 * lambda_2 * math.exp(-lambda_2 * a)) - (lambda_3 * (1.0 - a) / math.exp(lambda_4 * n)) - (lambda_6 * lambda_5 * f_p_max * math.exp(-monotonicity_val))
+            dL_db = -np.sum(residuals)/n - (lambda_6 * lambda_5 * math.exp(-monotonicity_val))
             a = a - alpha * dL_da
             b = b - alpha * dL_db
         f_cap_cs = a*f_ps + b
@@ -42,10 +73,10 @@ def gradient_descent(f_cs, f_ps,
             return a, b, loss
         return a, b
     except:
-        print a, b, f_cap_cs
         exc_type, exc_val, exc_tb = sys.exc_info()
         print "*** print_exception:"
         traceback.print_exception(exc_type, exc_val, exc_tb, file=sys.stdout)
+        print a, b, f_cap_cs
         raise Exception('Error')
 
     

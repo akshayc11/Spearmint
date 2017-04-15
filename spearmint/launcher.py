@@ -242,7 +242,18 @@ def main():
                         help='total number of validation runs permitted',
                         type=int,
                         default=None)
-
+    parser.add_argument('--min-y-prev',
+                        help='number of previous builds required for gelc',
+                        type=int,
+                        default=1)
+    parser.add_argument('--recency-weighting',
+                        type=bool,
+                        default=False,
+                        help='Recency weighting during loss computation?')
+    parser.add_argument('--monotonicity-condition',
+                        type=bool,
+                        default=False,
+                        help='Flag to enforce that final value should not be lesser than best seen so far')
     options = parser.parse_args()
 
     launch(options)
@@ -263,12 +274,17 @@ def launch(options):
     predictive_std_threshold = options.predictive_std_threshold
     nthreads = options.nthreads
     xlim = options.xlim
+    min_y_prev = options.min_y_prev
+    recency_weighting = options.recency_weighting
+    monotonicity_condition = options.monotonicity_condition
 
+    db = MongoDB(database_address=db_address)
+    job = db.load(experiment_name, 'jobs', {'id': job_id})
+    prev_jobs = db.load(experiment_name, 'jobs', {'status': 'complete'})
     if validation is False and elc is False:
-        db = MongoDB(database_address=db_address)
-        job = db.load(experiment_name, 'jobs', {'id': job_id})
         # We want to launch this job.
         start_time = time.time()
+        job = db.load(experiment_name, 'jobs', {'id': job_id})
         job['start time'] = start_time
         db.save(job, experiment_name, 'jobs', {'id': job_id})
 
@@ -323,34 +339,36 @@ def launch(options):
         if success:
             sys.stderr.write("Completed successfully in %0.2f seconds. [%s]\n"
                              % (end_time - start_time, result))
-
+            job = db.load(experiment_name, 'jobs', {'id': job_id})
             job['values'] = result
             job['status'] = 'complete'
             job['end time'] = end_time
+            db.save(job, experiment_name, 'jobs', {'id': job_id})
 
         else:
             sys.stderr.write("Job failed in %0.2f seconds.\n" %
                              (end_time - start_time))
 
             # Update metadata.
+            job = db.load(experiment_name, 'jobs', {'id': job_id})
             job['status'] = 'broken'
             job['end time'] = end_time
+            db.save(job, experiment_name, 'jobs', {'id': job_id})
 
-        db.save(job, experiment_name, 'jobs', {'id': job_id})
         return
     elif validation is True and elc is False:
-        db = MongoDB(database_address=db_address)
-        job = db.load(experiment_name, 'jobs', {'id': job_id})
         success = False
-
         try:
             if job['language'].lower() == 'python':
+                job = db.load(experiment_name, 'jobs', {'id': job_id})
                 validation_accs = python_validation_accs(job)
                 prev_validation_accs = job['validation_accs']
                 if len(prev_validation_accs) < len(validation_accs):
                     # New validation accs have been found
+                    job = db.load(experiment_name, 'jobs', {'id': job_id})
                     job['validation_accs'] = validation_accs
                     job['validation_updated'] = True
+                    db.save(job, experiment_name, 'jobs', {'id': job_id})
             else:
                 raise Exception("This language has not been implemented")
 
@@ -367,11 +385,15 @@ def launch(options):
         else:
             sys.stderr.write("Failed to get validation results for job %d.\n"
                              % job_id)
-        db.save(job, experiment_name, 'jobs', {'id': job_id})
+            job = db.load(experiment_name, 'jobs', {'id': job_id})
+            job['validation_updated'] = False
+            db.save(job, experiment_name, 'jobs', {'id': job_id})
         return
     elif validation is False and elc is True:
-        db = MongoDB(database_address=db_address)
-        job = db.load(experiment_name, 'jobs', {'id': job_id})
+        if prev_jobs is None:
+            prev_jobs = []
+        if isinstance(prev_jobs, dict):
+            prev_jobs = [prev_jobs]
         success = False
         try:
             if job['language'].lower() == 'python':
@@ -381,7 +403,10 @@ def launch(options):
                                       threshold,
                                       predictive_std_threshold,
                                       nthreads,
-                                      xlim)
+                                      xlim,
+                                      prev_jobs=prev_jobs,
+                                      min_y_prev=min_y_prev)
+                job = db.load(experiment_name, 'jobs', {'id': job_id})
                 job['elc_result'] = ret_dict
                 job['elc_status'] = 'complete'
                 db.save(job, experiment_name, 'jobs', {'id': job_id})
@@ -393,18 +418,18 @@ def launch(options):
             traceback.print_exc()
             sys.stderr.write("Problem getting extrapolation running\n")
             print sys.exc_info()
+            job = db.load(experiment_name, 'jobs', {'id': job_id})
             job['elc_status'] = 'broken'
+            db.save(job, experiment_name, 'jobs', {'id': job_id})
         if success:
             sys.stderr.write(
                 "Completed getting extrapolation for job %d.\n" % job_id)
         else:
             sys.stderr.write("Failed to get extrapolation for job %d.\n"
                              % job_id)
-        db.save(job, experiment_name, 'jobs', {'id': job_id})
-
     else:
         sys.stderr.write("Error: both validation and ELC specified as true.\n")
-        return
+    return
 
 
 def python_launcher(job):
@@ -509,26 +534,33 @@ def python_validation_accs(job):
 
 
 def python_elc(job, mode, prob_x_greater_type, threshold,
-               predictive_std_threshold, nthreads, xlim):
+               predictive_std_threshold, nthreads, xlim, prev_jobs = [], min_y_prev=1,
+               recency_weighting=False, monotonicity_condition=False):
+    y_list = np.array(job['validation_accs'])
+    y_best = job['y_best']
+    y_prev_list = [np.array(j['validation_accs']) for j in prev_jobs]
     if mode == 'conservative':
         term_crit = ConservativeTerminationCriterion(
-            xlim, nthreads, prob_x_greater_type,
+            y_list, xlim, nthreads, prob_x_greater_type,
             predictive_std_threshold=predictive_std_threshold)
     elif mode == 'optimistic':
         term_crit = OptimisticTerminationCriterion(
-            xlim, nthreads, prob_x_greater_type,
+            y_list, xlim, nthreads, prob_x_greater_type,
             predictive_std_threshold=predictive_std_threshold)
+    elif mode == 'gelc-conservative':
+        term_crit = GelcConservativeTerminationCriterion(
+            y_list, xlim,
+            prob_x_greater_type=prob_x_greater_type,
+            y_prev_list=y_prev_list,
+            predictive_std_threshold=predictive_std_threshold,
+            min_y_prev=min_y_prev,
+            recency_weighting=recency_weighting,
+            monotonicity_condition=monotonicity_condition)
     else:
         raise Exception("Invalid mode for ELC")
-    y_list = job['validation_accs']
-    y_best = job['y_best']
-    result = term_crit.run(y_list, y_best, threshold=threshold)
+    result = term_crit.run(y_best, threshold=threshold)
     return result
 
-def python_gelc(job, prev_jobs, mode, prob_x_greater_type, threshold, predictive_std_threshold, nthreads, xlim):
-    assert mode == 'conservative'
-    # Get the full jobs'
-    term_crit = GelcConservativeTerminationCriterion()
 # # BROKEN
 # def matlab_launcher(job):
 #     # Run it as a Matlab function.

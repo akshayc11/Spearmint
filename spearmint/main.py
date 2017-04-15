@@ -260,7 +260,7 @@ def get_options():
 
     if options["validation-check"] is True:
         if "validation-check-time" not in options:
-            options["validation-check-time"] = 5
+            options["validation-check-time"] = 5.0
 
     return options, expt_dir
 
@@ -280,10 +280,12 @@ def main():
     db_address = options['database']['address']
     sys.stderr.write('Using database at %s.\n' % db_address)
     db = MongoDB(database_address=db_address)
+    jobs = load_jobs(db, experiment_name)
+    remove_broken_jobs(db, jobs, experiment_name, resources)
     if tired(db, experiment_name, resources):
         raise Exception('Resource seems to be tired even before beginning')
-    validation_check_time = options.get('validation-check-time', 100000)
     if options['validation-check'] is True:
+        validation_check_time_gap = options['validation-check-time']
         elc_resource = parse_elc_resource_from_config(options)
     while True:
 
@@ -308,6 +310,16 @@ def main():
                 # load_tasks
                 jobs = load_jobs(db, experiment_name)
 
+                # Dispatch a validation_acc check to all the completed jobs
+                # To ensure we have the latest validation information
+                if options['validation-check'] == True:
+                    completed_jobs = [j for j in jobs if j['status'] == 'complete']
+                    for j in completed_jobs:
+                        sys.stderr.write('Getting all validations for completed job {}\n'.format(j['id']))
+                        p_id = resource.attempt_dispatch_validation(experiment_name, j, db_address, expt_dir)
+                        j_id = j['id']
+                        j = db.load(experiment_name, 'jobs', {'id': j_id})
+                        save_job(j, db, experiment_name)
                 # Remove any broken jobs from pending.
                 remove_broken_jobs(db, jobs, experiment_name, resources)
 
@@ -321,7 +333,6 @@ def main():
                                                        suggested_job,
                                                        db_address,
                                                        expt_dir)
-                print process_id
                 # Set the status of the job appropriately (successfully
                 # submitted or not)
                 if process_id is None:
@@ -345,27 +356,27 @@ def main():
         if tired(db, experiment_name, resources):
             time.sleep(options.get('polling-time', 5))
 
-        if options.get('validation-check', False) is True:
+        if options['validation-check'] is True:
             # print "Checking Validation"
             # get list of all pending jobs
+            jobs = load_jobs(db, experiment_name)
             curr_time = time.time()
-            # if curr_time - validation_check_start > validation_check_time:
             pending_jobs = [job for job in jobs
-                            if job['status'] == 'pending' and
-                            job['elc_status'] not in ['pending']]
+                            if job['status'] == 'pending']
             for job in pending_jobs:
                 time_last_checked = job['validation check time']
-                if curr_time - time_last_checked > validation_check_time:
+                if curr_time - time_last_checked > validation_check_time_gap:
                     # print 'dispatch validation for job {}'.format(
                     #     job['id'])
                     process_id = resource.attempt_dispatch_validation(
                         experiment_name,
                         job, db_address, expt_dir)
                     j_id = job['id']
+                    validation_check_time = time.time()
                     job = db.load(experiment_name, 'jobs', {'id': j_id})
-                    job['validation check time'] = time.time()
+                    job['validation check time'] = validation_check_time
                     save_job(job, db, experiment_name)
-
+            # Check if validation has been updated for any of the pending jobs
             jobs = load_jobs(db, experiment_name)
             pending_jobs = [temp_job for temp_job in jobs
                             if temp_job['status'] == 'pending']
@@ -374,23 +385,34 @@ def main():
                     sys.stderr.write('Updated Validation for job: {}\n'.format(job['id']))
                     print job['validation_accs']
                     j_id = job['id']
-                    job = db.load(experiment_name, 'jobs', {'id': j_id})
-                    job['validation_updated'] = False
+                    y_best = get_ybest(db, experiment_name, task_name=job['tasks'][0])
                     # TODO: get the best available validation so far:
                     # Assumption: the first task is the one we expect to run
                     # elc on
-                    job['y_best'] = get_ybest(db, experiment_name,
-                                              task_name=job['tasks'][0])
+                    job = db.load(experiment_name, 'jobs', {'id': j_id})
+                    job['validation_updated'] = False
+                    job['y_best'] = y_best
                     save_job(job, db, experiment_name)
                     # TODO: dispatch the elc job
+                    job = db.load(experiment_name, 'jobs', {'id': j_id})
                     if job['elc_status'] in ['new', 'pending']:
                         # Kill existing elc
-                        elc_resource.kill_job_elc(job)
-                    sys.stderr.write("Attempting to dispatch elc job\n")
+                        sys.stderr.write('Trying to kill elc for job {}\n'.format(job['id']))
+                        killed = elc_resource.kill_elc(job)
+                        if killed is True:
+                            assert not elc_resource.is_elc_alive(job), 'Elc for job {} should have been killed'.format(job['id'])
+                            sys.stderr.write('Elc Status: {}'.format(killed))
+                        job = db.load(experiment_name, 'jobs', {'id': job['id']})
+                        job['elc_status'] = 'killed'
+                        job['elc_proc_id'] = None
+                        save_job(job,db, experiment_name)
+                    sys.stderr.write("Attempting to dispatch elc job for {}\n".format(job['id']))
+                    job = db.load(experiment_name, 'jobs', {'id': j_id})
                     process_id = elc_resource.attempt_dispatch(experiment_name,
                                                                job,
                                                                db_address,
                                                                expt_dir)
+                    sys.stderr.write('Dispatched elc for job {} with process id: {}\n'.format(job['id'], process_id))
                     job = db.load(experiment_name, 'jobs', {'id': j_id})
                     if process_id is None:
                         job['elc_status'] = 'broken'
@@ -404,7 +426,7 @@ def main():
             # Any pending job whos elc_status is broken will be allowed to
             # continue
             pending_jobs = [temp_job for temp_job in jobs
-                            if temp_job['status'] in 'new' or 'pending']
+                            if temp_job['status'] in ['new','pending']]
             unprocessed_jobs = [temp_job for temp_job in pending_jobs
                                 if temp_job['elc_status'] == 'complete']
             # PROBLEM: if we have multiple tasks, I cannot simply kill. I will
@@ -414,18 +436,24 @@ def main():
                 elc_ret = job['elc_result']
                 if elc_ret['terminate'] is True:
                     sys.stderr.write('Extrapolation wants to terminate job {}.\n'.format(job['id']))
+                    job = db.load(experiment_name, 'jobs', {'id': j_id});
                     job['values'] = 1.0 - elc_ret['predictive_mean']
                     job['std_dev'] = elc_ret['predictive_std']
+                    save_job(job, db, experiment_name)
                     killed = resource.kill_job(job)
                     if killed is True:
                         assert not resource.is_job_alive(job), "Job {} was supposed to be killed".format(job['id'])
                         sys.stderr.write('Job [{}] killed'.format(job['proc_id']))
+                    job = db.load(experiment_name, 'jobs', {'id': j_id});
                     job['status'] = 'killed'
                     job['proc_id'] = None
+                    save_job(job, db, experiment_name)
+                    
                 else:
                     sys.stderr.write('Extrapolation allowing the job {} to proceed.\n'.format(job['id']))
-                job['elc_status'] = 'processed'
-                save_job(job, db, experiment_name)
+                    job = db.load(experiment_name, 'jobs', {'id': j_id});
+                    job['elc_status'] = 'processed'
+                    save_job(job, db, experiment_name)
 
         if done(db, experiment_name, resources):
             return
@@ -556,7 +584,7 @@ def get_suggestion(chooser, task_names, db, expt_dir, options, resource_name):
         'end time': None,
         'validation_accs': np.array([]),
         'validation_updated': False,
-        'validation check time': time.time(),
+        'validation check time': -1,
         'y_best': None,
         'elc_result': None,
         'elc_status': None,
