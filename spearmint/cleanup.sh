@@ -185,12 +185,20 @@
 #! /bin/bash
 # This is a simple script to cleanup the intermediate files in 
 # spearmint experiment directories
-[[ -n "$1" ]] || { echo "Usage: ./cleanup.sh <experiment_dir>"; exit 0 ; }
+[[ -n "$1" ]] || { echo "Usage: ./cleanup.sh <experiment_dir> [<config-file>] [<output-dir>]"; exit 0 ; }
 if [ -d $1 ]
 then
-    python -c "import spearmint.utils.cleanup as cleanup; import sys; cleanup.cleanup(sys.argv[1])" $1
+    if [ -f $1/$2 ]; then 
+	python -c "import spearmint.utils.cleanup as cleanup; import sys; cleanup.cleanup(sys.argv[1], config_file=sys.argv[2])" $1 $2
+    else
+	python -c "import spearmint.utils.cleanup as cleanup; import sys; cleanup.cleanup(sys.argv[1])" $1
+    fi
     cd $1
-    rm output/*
 else
     echo "$1 is not a valid directory"
+    exit 0;
 fi
+
+opdir=output/$3
+
+rm ${opdir}/*

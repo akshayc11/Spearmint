@@ -190,12 +190,12 @@ import json
 from parsing import parse_db_address
 
 
-def cleanup(path):
+def cleanup(path, config_file='config.json'):
 
     if not os.path.isdir(path):
         raise Exception("%s is not a valid directory" % path)
 
-    with open(os.path.join(path, 'config.json'), 'r') as f:
+    with open(os.path.join(path, config_file), 'r') as f:
         cfg = json.load(f)
 
     db_address = parse_db_address(cfg)
