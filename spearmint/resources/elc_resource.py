@@ -252,7 +252,7 @@ class ElcResource(object):
 
     def kill_elc(self, job):
         if self.is_elc_alive(job):
-            self.scheduler.kill(job['elc_proc_id'])
+            self.scheduler.kill(job['elc_process'])
 
     def attempt_dispatch(self, experiment_name, job, db_address, expt_dir):
         """Attempt to dispatch an ELC job using the elc scheduler.
@@ -278,7 +278,7 @@ class ElcResource(object):
         min_y_prev = self.resource_config['min_y_prev']
         recency_weighting = self.resource_config['recency-weighting']
         monotonicity_condition = self.resource_config['monotonicity-condition']
-        process_id = self.scheduler.submit_elc(job['id'], experiment_name,
+        process = self.scheduler.submit_elc(job['id'], experiment_name,
                                                expt_dir, db_address,
                                                mode,
                                                prob_x_greater_type,
@@ -289,6 +289,7 @@ class ElcResource(object):
                                                min_y_prev=min_y_prev,
                                                recency_weighting=recency_weighting,
                                                monotonicity_condition=monotonicity_condition)
+        process_id = process.pid
         if process_id is not None:
             sys.stderr.write('Submitted elc job {} with {} scheduler. \
                              (process_id: {})\n'.format(job['id'],
@@ -297,4 +298,4 @@ class ElcResource(object):
         else:
             sys.stderr.write('Failed to submit elc job {}.\n'.format(
                 job['id']))
-        return process_id
+        return process

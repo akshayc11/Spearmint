@@ -389,9 +389,9 @@ class Resource(object):
         if job['resource'] != self.name:
             raise Exception("This job does not belong to me!")
 
-        process_id = self.scheduler.submit(job['id'], experiment_name,
+        process = self.scheduler.submit(job['id'], experiment_name,
                                            expt_dir, db_address)
-
+        process_id = process.pid
         if process_id is not None:
             sys.stderr.write('Submitted job %d with %s scheduler \
                              (process id: %d).\n'
@@ -400,7 +400,7 @@ class Resource(object):
         else:
             sys.stderr.write('Failed to submit job %d.\n' % job['id'])
 
-        return process_id
+        return process
 
     def attempt_dispatch_validation(self, experiment_name, job, db_address,
                                     expt_dir):
@@ -419,9 +419,10 @@ class Resource(object):
         if job['resource'] != self.name:
             raise Exception("This job does not belong to me!")
 
-        process_id = self.scheduler.check_validation_accs(
+        process = self.scheduler.check_validation_accs(
             job['id'],
             experiment_name, expt_dir, db_address)
+        process_id = process.pid
         if process_id is None:
             sys.stderr.write('Failed to submit validation check for job %d.\n'
                              % job['id'])
@@ -434,4 +435,4 @@ class Resource(object):
         sys.stderr.write("Resource {} trying to kill job {}.\n".format(self.name, job['id']))
         if job['resource'] != self.name:
             raise Exception("This job does not belong to me!")
-        return self.scheduler.kill(job['proc_id'])
+        return self.scheduler.kill(job['process'])

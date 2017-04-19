@@ -197,6 +197,12 @@ try:
 except ImportError:
     import json
 
+try:
+    import cPickle as pickle
+except:
+    import pickle
+
+from bson.binary import Binary
 
 from spearmint.resources.resource import parse_resources_from_config
 from spearmint.resources.resource import print_resources_status
@@ -316,7 +322,7 @@ def main():
                     completed_jobs = [j for j in jobs if j['status'] == 'complete']
                     for j in completed_jobs:
                         sys.stderr.write('Getting all validations for completed job {}\n'.format(j['id']))
-                        p_id = resource.attempt_dispatch_validation(experiment_name, j, db_address, expt_dir)
+                        val_process = resource.attempt_dispatch_validation(experiment_name, j, db_address, expt_dir)
                         j_id = j['id']
                         j = db.load(experiment_name, 'jobs', {'id': j_id})
                         save_job(j, db, experiment_name)
@@ -329,10 +335,11 @@ def main():
                                                resource_name)
 
                 # Submit the job to the appropriate resource
-                process_id = resource.attempt_dispatch(experiment_name,
-                                                       suggested_job,
-                                                       db_address,
-                                                       expt_dir)
+                process = resource.attempt_dispatch(experiment_name,
+                                                    suggested_job,
+                                                    db_address,
+                                                    expt_dir)
+                process_id = process.pid
                 # Set the status of the job appropriately (successfully
                 # submitted or not)
                 if process_id is None:
@@ -341,6 +348,7 @@ def main():
                 else:
                     suggested_job['status'] = 'pending'
                     suggested_job['proc_id'] = process_id
+                    suggested_job['process'] = Binary(pickle.dumps(process))
                     save_job(suggested_job, db, experiment_name)
 
                 jobs = load_jobs(db, experiment_name)
@@ -368,7 +376,7 @@ def main():
                 if curr_time - time_last_checked > validation_check_time_gap:
                     # print 'dispatch validation for job {}'.format(
                     #     job['id'])
-                    process_id = resource.attempt_dispatch_validation(
+                    process = resource.attempt_dispatch_validation(
                         experiment_name,
                         job, db_address, expt_dir)
                     j_id = job['id']
@@ -405,20 +413,23 @@ def main():
                         job = db.load(experiment_name, 'jobs', {'id': job['id']})
                         job['elc_status'] = 'killed'
                         job['elc_proc_id'] = None
+                        job['elc_process'] = None
                         save_job(job,db, experiment_name)
                     sys.stderr.write("Attempting to dispatch elc job for {}\n".format(job['id']))
                     job = db.load(experiment_name, 'jobs', {'id': j_id})
-                    process_id = elc_resource.attempt_dispatch(experiment_name,
+                    process = elc_resource.attempt_dispatch(experiment_name,
                                                                job,
                                                                db_address,
                                                                expt_dir)
-                    sys.stderr.write('Dispatched elc for job {} with process id: {}\n'.format(job['id'], process_id))
+                    process_id = process.pid
+                    sys.stderr.write('Dispatched elc for job {} with process id: {}\n'.format(job['id'], process.pid))
                     job = db.load(experiment_name, 'jobs', {'id': j_id})
                     if process_id is None:
                         job['elc_status'] = 'broken'
                     else:
                         job['elc_status'] = 'pending'
                         job['elc_proc_id'] = process_id
+                        job['elc_process'] = Binary(pickle.dumps(process))
                     save_job(job, db, experiment_name)
 
             jobs = load_jobs(db, experiment_name)
@@ -447,6 +458,7 @@ def main():
                     job = db.load(experiment_name, 'jobs', {'id': j_id});
                     job['status'] = 'killed'
                     job['proc_id'] = None
+                    job['process'] = None
                     save_job(job, db, experiment_name)
                     
                 else:
@@ -589,6 +601,8 @@ def get_suggestion(chooser, task_names, db, expt_dir, options, resource_name):
         'elc_result': None,
         'elc_status': None,
         'elc_proc_id': None,
+        'process': None,
+        'elc_process': None
     }
 
     save_job(job, db, experiment_name)

@@ -192,7 +192,10 @@ from abstract_scheduler import AbstractScheduler
 
 import spearmint
 
-
+try:
+    import cPickle as pickle
+except:
+    import pickle
 def init(*args, **kwargs):
     return LocalScheduler(*args, **kwargs)
 
@@ -254,7 +257,7 @@ class LocalScheduler(AbstractScheduler):
         # else:
             # sys.stderr.write("Submitted job as process: %d\n" % process.pid)
 
-        return process.pid
+        return process
 
     def alive(self, process_id):
         """Check wether a PID is alive
@@ -270,13 +273,17 @@ class LocalScheduler(AbstractScheduler):
         try:
             # Send an alive signal to proc (note this could kill it in windows)
             os.kill(process_id, 0)
+            # It can be a zombie child. 
+            proc = psutil.Process(process_id)
+            if proc.status == psutil.STATUS_ZOMBIE:
+                return False
         except OSError:
             # Job is no longer running.
             return False
         else:
             return True
 
-    def kill(self, process_id):
+    def kill(self, process_str):
         """Kill a process given ID
 
         Given a PID, terminate it with the SIGTERM command
@@ -287,12 +294,11 @@ class LocalScheduler(AbstractScheduler):
         Returns:
             bool -- true if killed, else false.
         """
+        process = pickle.loads(process_str)
+        process_id = process.pid
         if self.alive(process_id):
-            try:
-                os.killpg(os.getpgid(process_id), signal.SIGTERM)
-                return True
-            except:
-                return False
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            return True
         else:
             return False
 
@@ -331,7 +337,7 @@ class LocalScheduler(AbstractScheduler):
 
         output_filename = os.path.join(output_directory,
                                        '%08d-validation.out' % job_id)
-        output_file = open(output_filename, 'w')
+        output_file = open(output_filename, 'wa')
 
         process = subprocess.Popen(cmd, stdout=output_file,
                                    stderr=output_file,
@@ -345,7 +351,7 @@ class LocalScheduler(AbstractScheduler):
         # else:
             # sys.stderr.write("Submitted job as process: %d\n" % process.pid)
 
-        return process.pid
+        return process
 
     def submit_elc(self, job_id, experiment_name, experiment_dir,
                    database_address, mode, prob_x_greater_type, threshold,
@@ -395,7 +401,7 @@ class LocalScheduler(AbstractScheduler):
 
         output_filename = os.path.join(output_directory,
                                        '%08d-elc.out' % job_id)
-        output_file = open(output_filename, 'w')
+        output_file = open(output_filename, 'wa')
 
         process = subprocess.Popen(cmd, stdout=output_file,
                                    stderr=output_file,
@@ -409,4 +415,4 @@ class LocalScheduler(AbstractScheduler):
         # else:
             # sys.stderr.write("Submitted job as process: %d\n" % process.pid)
 
-        return process.pid
+        return process
