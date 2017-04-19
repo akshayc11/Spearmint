@@ -243,7 +243,8 @@ class LocalScheduler(AbstractScheduler):
 
         process = subprocess.Popen(cmd, stdout=output_file,
                                    stderr=output_file,
-                                   shell=True)
+                                   shell=True,
+                                   preexec_fn=os.setsid)
 
         process.poll()
         if process.returncode is not None and process.returncode < 0:
@@ -287,26 +288,11 @@ class LocalScheduler(AbstractScheduler):
             bool -- true if killed, else false.
         """
         if self.alive(process_id):
-
             try:
-                p = psutil.Process(process_id)
-                for c in p.children(recursive=True):
-                    c.terminate()
-                p.terminate()
-                #os.kill(process_id, signal.SIGTERM)
-            except:
-                # Job is no longer running
-                return False
-            
-            # This should have terminated the job.
-            try:
-                os.kill(process_id, 0)
-                return False
-            except:
-                print "Job terminated"
+                os.killpg(os.getpgid(process_id), signal.SIGTERM)
                 return True
-            else:
-                return True
+            except:
+                return False
         else:
             return False
 

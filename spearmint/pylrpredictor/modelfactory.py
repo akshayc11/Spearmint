@@ -9,8 +9,8 @@ from curvemodels import MCMCCurveModelCombination
 
 from ensemblecurvemodel import CurveEnsemble, CurveModelEnsemble
 
-from mcmcmodelplotter import CurveModelEnsemblePlotter
-from mcmcmodelplotter import MCMCCurveModelCombinationPlotter
+# from mcmcmodelplotter import CurveModelEnsemblePlotter
+# from mcmcmodelplotter import MCMCCurveModelCombinationPlotter
 
 
 def setup_model_combination(xlim,
@@ -122,8 +122,8 @@ def create_model(model_type, xlim, nthreads=1, recency_weighting=False):
     return curve_model
 
 
-def create_plotter(model_type, model):
-    if model_type == "curve_combination":
-        return MCMCCurveModelCombinationPlotter(model)
-    elif model_type == "curve_model" or model_type == "curve":
-        return CurveModelEnsemblePlotter(model)
+# def create_plotter(model_type, model):
+#     if model_type == "curve_combination":
+#         return MCMCCurveModelCombinationPlotter(model)
+#     elif model_type == "curve_model" or model_type == "curve":
+#         return CurveModelEnsemblePlotter(model)
