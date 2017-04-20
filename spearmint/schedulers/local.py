@@ -405,7 +405,8 @@ class LocalScheduler(AbstractScheduler):
 
         process = subprocess.Popen(cmd, stdout=output_file,
                                    stderr=output_file,
-                                   shell=True)
+                                   shell=True,
+                                   preexec_fn=os.setsid)
 
         process.poll()
         if process.returncode is not None and process.returncode < 0:

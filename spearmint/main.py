@@ -444,6 +444,7 @@ def main():
             # need to populate the results for all the tasks.
             # Applicable in constrained tasks
             for job in unprocessed_jobs:
+                sys.stderr.write('processing elc for job {}\n'.format(job['id']))
                 elc_ret = job['elc_result']
                 if elc_ret['terminate'] is True:
                     sys.stderr.write('Extrapolation wants to terminate job {}.\n'.format(job['id']))
@@ -710,6 +711,23 @@ def load_task_group(db, options, task_names=None):
 #             best_job_fh.write('%s: %s\n' % (name, params))
 
 #     best_job_fh.close()
+
+def clean_last_job(config_file):
+    f = open(config_file)
+    options = json.load(f)
+    expt_name = options['experiment-name']
+    db_address = parse_db_address(options)
+    db = MongoDB(database_address=db_address)
+    jobs = load_jobs ( db, expt_name )
+    from utils import cleanup
+    hypers = load_hypers(db, expt_name)
+    print jobs
+    jobs = jobs[0:-1]
+    cleanup.cleanup('../examples/mxnet-mnist-elc')
+    for j in jobs:
+        save_job(j, db, expt_name)
+
+    save_hypers(hypers, db, expt_name)
 
 if __name__ == '__main__':
     main()
