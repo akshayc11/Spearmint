@@ -58,7 +58,7 @@ class TerminationCriterion(object):
     
     def fit(self, y_curr, n):
         self.y_curr = y_curr
-        if self.min_y_prev >= len(self.y_prev_list):
+        if len(self.y_prev_list) < self.min_y_prev:
             return False
         for y_idx in range(len(self.y_prev_list)):
             y_prev = self.y_prev_list[y_idx]
@@ -135,7 +135,7 @@ class TerminationCriterion(object):
         min_len = min(len(f_cs), len(f_ps))
         f_c = f_cs[0:min_len]
         f_p = f_ps[0:min_len]
-        f_c_max = f_c[-1]
+        f_c_max = max(f_cs)
         a_b_losses = []
         for i in xrange(int(2*n)):
             a_b_loss = gradient_descent(f_c, f_p, return_loss=True,
