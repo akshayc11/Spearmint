@@ -275,7 +275,7 @@ class LocalScheduler(AbstractScheduler):
             os.kill(process_id, 0)
             # It can be a zombie child. 
             proc = psutil.Process(process_id)
-            if proc.status == psutil.STATUS_ZOMBIE:
+            if proc.status == psutil.STATUS_ZOMBIE or proc.status == psutil.STATUS_DEAD:
                 return False
         except OSError:
             # Job is no longer running.
