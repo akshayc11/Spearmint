@@ -155,18 +155,16 @@ class TerminationCriterion(object):
         return a_b_losses
 
 class ConservativeTerminationCriterion(TerminationCriterion):
-
     def __init__(self, y_curr, xlim, prob_x_greater_type=None,
                  y_prev_list = [], n=100,
-                 predictive_std_threshold=PREDICTIVE_STD_THRESHOLD,
+                 predictive_std_threshold=None,
                  min_y_prev=1,
                  recency_weighting=False,
                  monotonicity_condition=True):
-        self.predictive_std_threshold = predictive_std_threshold
         super(ConservativeTerminationCriterion, self).__init__(
             y_curr, xlim, prob_x_greater_type,
             y_prev_list=y_prev_list, n=n, min_y_prev=min_y_prev,
-            recency_weighting=recency_weighting, monotonicity_condition=True)
+            recency_weighting=recency_weighting, monotonicity_condition=True, predictive_std_threshold=predictive_std_threshold)
     
     def run(self, y_best, threshold=IMPROVEMENT_PROB_THRESHOLD):
         """
