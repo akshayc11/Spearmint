@@ -409,7 +409,8 @@ def main():
                         killed = elc_resource.kill_elc(job)
                         if killed is True:
                             #assert not elc_resource.is_elc_alive(job), 'Elc for job {} should have been killed'.format(job['id'])
-                            sys.stderr.write('Elc Status: {}'.format(killed))
+                            pass
+                        sys.stderr.write('Elc Status: {}'.format(killed))
                         job = db.load(experiment_name, 'jobs', {'id': job['id']})
                         job['elc_status'] = 'killed'
                         job['elc_proc_id'] = None
@@ -455,7 +456,7 @@ def main():
                     killed = resource.kill_job(job)
                     if killed is True:
                         #assert not resource.is_job_alive(job), "Job {} was supposed to be killed".format(job['id'])
-                        sys.stderr.write('Job [{}] killed'.format(job['proc_id']))
+                        sys.stderr.write('Job [{}] killed\n'.format(job['id']))
                     job = db.load(experiment_name, 'jobs', {'id': j_id});
                     job['status'] = 'killed'
                     job['proc_id'] = None

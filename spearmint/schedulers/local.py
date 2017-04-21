@@ -298,6 +298,7 @@ class LocalScheduler(AbstractScheduler):
         process_id = process.pid
         if self.alive(process_id):
             os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            process.kill()
             return True
         else:
             return False
