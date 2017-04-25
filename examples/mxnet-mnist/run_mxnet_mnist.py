@@ -7,7 +7,6 @@ max_epochs = 20
 lr_step_epochs = [','.join([str(step_size + step_size*x) for x in range(max_epochs/step_size - 1)]) for step_size in [4,5,10]]
 train_cmd = 'python train_mnist_custom.py --gpus 0 --num-layers {} --num-hidden {} --lr {} --lr-factor {} --lr-step-epoch {}'
 out_dir='/data-local/akshayc/Workspace/Software/Spearmint-global/examples/mxnet-mnist/log'
-mxnet_dir='/home/akshayc/mxnet/example/image-classification'
 
 def get_best_validation_accuracy(out_file_name):
     out_file = open(out_file_name, 'r')
@@ -26,7 +25,6 @@ def run(num_layers, num_hidden, lr, lr_factor, lr_step_epoch, out_file_name, par
     out_file.close()
     
 def main(job_id, params):
-    os.chdir(mxnet_dir)
     num_layers = int(params['num_hidden_layers'])
     num_hidden = 32 * int(params['num_neurons'])
     lr = float(params['lr'])
