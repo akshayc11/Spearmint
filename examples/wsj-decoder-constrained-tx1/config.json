@@ -1,0 +1,55 @@
+{
+    "language"        : "PYTHON",
+    "main-file"       : "decode",
+    "experiment-name" : "constrained-decode-tx1",
+    "max-finished-jobs" : 20,
+    "variables" : {
+	"ac" : {
+	    "type" : "FLOAT",
+	    "size" : 1,
+	    "min"  : 0.05,
+	    "max"  : 0.15
+	},
+	"b" : {
+	    "type" : "FLOAT",
+	    "size" : 1,
+	    "min"  : 10,
+	    "max"  : 18
+	},
+	"lb" : {
+	    "type" : "FLOAT",
+	    "size" : 1,
+	    "min"  : 4,
+	    "max"  : 9
+	},
+	"mina" : {
+	    "type" : "INT",
+	    "size" : 1,
+	    "min"  : 0,
+	    "max"  : 11
+	},
+	"maxa" : {
+	    "type" : "INT",
+	    "size" : 1,
+	    "min"  : 0,
+	    "max"  : 10
+	},
+	"pr" : {
+	    "type": "INT",
+	    "size" : 1,
+	    "min" : 0,
+	    "max" : 8
+	}
+    },
+    "tasks": {
+	"wer": {
+	    "type": "OBJECTIVE",
+	    "likelihood": "NOISELESS"
+	},
+	"rtf": {
+	    "type": "CONSTRAINT",
+	    "likelihood": "NOISELESS"
+	}
+    }
+}
+
