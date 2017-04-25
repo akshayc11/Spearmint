@@ -1,7 +1,7 @@
 {
     "language": "PYTHON",
     "main-file": "run_mxnet_resnet",
-    "experiment-name": "mxnet-resnet-elc",
+    "experiment-name": "mxnet-resnet-elc-trial",
     "polling-time": 5,
     "resources": {
 	"my-machine": {
