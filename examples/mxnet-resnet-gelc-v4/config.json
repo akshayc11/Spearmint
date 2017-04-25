@@ -1,0 +1,57 @@
+{
+    "language": "PYTHON",
+    "main-file": "run_mxnet_resnet",
+    "experiment-name": "mxnet-resnet-gelc-v4",
+    "polling-time": 5,
+    "resources": {
+	"my-machine": {
+	    "scheduler": "local",
+	    "max-concurrent": 1,
+	    "max-finished-jobs": 50
+	}
+    },
+    "validation-check": true,
+    "elc_resource": {
+	"mode": "gelc-conservative",
+	"prob_x_greater_type": "posterior_mean_prob_x_greater_than",
+	"threshold": 0.05,
+	"predictive_std_threshold": 0.001,
+	"xlim": 300,
+	"nthreads": 4,
+	"min_y_prev": 4,
+	"recency-weighting": true,
+	"monotonicity-condition": true
+    },
+    "variables": {
+	"per_unit": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 1,
+	    "max": 5
+	},
+	"num_segments": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 1,
+	    "max": 4
+	},
+	"lr": {
+	    "type": "FLOAT",
+	    "size": 1,
+	    "min": 0.01,
+	    "max": 0.1
+	},
+	"lr_factor_idx": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 4
+	},
+	"lr_step_epoch_idx": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 5
+	}
+    }
+}
