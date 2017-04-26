@@ -12,3 +12,5 @@ spearmint.egg-info/
 build/
 dist/
 *~
+output/
+log/
