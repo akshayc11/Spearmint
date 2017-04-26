@@ -33,10 +33,11 @@ Spearmint implements a combination of the algorithms detailed in the following p
 **STEP 1: Installation**  
 
 1. Install [python](https://www.python.org/), [numpy](http://www.numpy.org/), [scipy](http://www.numpy.org/), [pymongo](https://api.mongodb.org/python/current/). For academic users, the [anaconda](http://continuum.io/downloads) distribution is great. Use numpy 1.8 or higher. We use python 2.7.
-2. Download/clone the spearmint code  
-3. Install the spearmint package using pip: `pip install -e \</path/to/spearmint/root\>` (the -e means changes will be reflected automatically)  
-4. Download and install MongoDB: https://www.mongodb.org/   
-5. Install the pymongo package using e.g., pip `pip install pymongo` or anaconda `conda install pymongo`  
+2. Install psutil, emcee, triangle, for the learning curve predictions. branch
+3. Download and install MongoDB: https://www.mongodb.org/   
+4. Install the pymongo package using e.g., pip `pip install pymongo` or anaconda `conda install pymongo`  
+5. Download/clone the spearmint code  
+6. Install the spearmint package using pip: `pip install -e \</path/to/spearmint/root\>` (the -e means changes will be reflected automatically)  
 
 **STEP 2: Setting up your experiment**  
 1. Create a callable objective function. See `./examples/simple/branin.py` as an example  
@@ -49,3 +50,13 @@ Spearmint implements a combination of the algorithms detailed in the following p
 
 **STEP 4: Looking at your results**  
 Spearmint will output results to standard out / standard err. You can also load the results from the database and manipulate them directly. 
+
+**Running extrapolation of learning curves**
+To run the extrapolation of learning curve examples in the example folder (refer to mxnet-* folders):
+You will need [MXNET](https://www.mxnet.io)
+The current examples use mxnet with GPU.
+
+***Note regarding MNIST and ELC
+The baseline method, which uses emcee is very slow compared to the actual training time required for each epoch in MNIST 
+Hence, we have elected to show this using the CPU training pipeline, with substantial idle time between epochs.
+
