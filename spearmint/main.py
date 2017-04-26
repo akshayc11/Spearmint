@@ -417,11 +417,15 @@ def main():
                         job['elc_process'] = None
                         save_job(job,db, experiment_name)
                     sys.stderr.write("Attempting to dispatch elc job for {}\n".format(job['id']))
+
+                    # TODO: get the covariances from the chooser into the job
+                    # job['prev_jobs_cov'] = get_prev_input_covariances(chooser, task_names, db, expt_dir, options, resource_name, job)
                     job = db.load(experiment_name, 'jobs', {'id': j_id})
+                    #
                     process = elc_resource.attempt_dispatch(experiment_name,
-                                                               job,
-                                                               db_address,
-                                                               expt_dir)
+                                                            job,
+                                                            db_address,
+                                                            expt_dir)
                     process_id = process.pid
                     sys.stderr.write('Dispatched elc for job {} with process id: {}\n'.format(job['id'], process.pid))
                     job = db.load(experiment_name, 'jobs', {'id': j_id})
@@ -532,6 +536,18 @@ def remove_broken_jobs(db, jobs, experiment_name, resources):
                     job['status'] = 'broken'
                     save_job(job, db, experiment_name)
 
+# def get_prev_input_covariances(chooser, task_names, db, db, expt_dir, options, resource_name, curr_job):
+#     if len(task_names) == 0:
+#         raise Exception("Error: trying to get covariances for 0 tasks")
+#     expt_name = options['experiment_name']
+#     # Only options for tasks in task_names
+#     task_options = {task: options['tasks'][task] for task in task_names}
+    
+#     # Load the tasks from the database.
+#     task_group = TaskGroup(task_options, options['variables'])
+    
+#     jobs = load_jobs(db, options['experiment-name'])
+#     completed_inputs = 
 
 # TODO: support decoupling i.e. task_names containing more than one task,
 #       and the chooser must choose between them in addition to choosing X
@@ -604,7 +620,8 @@ def get_suggestion(chooser, task_names, db, expt_dir, options, resource_name):
         'elc_status': None,
         'elc_proc_id': None,
         'process': None,
-        'elc_process': None
+        'elc_process': None,
+        'prev_jobs_cov': None,
     }
 
     save_job(job, db, experiment_name)
@@ -657,7 +674,7 @@ def load_task_group(db, options, task_names=None):
     if jobs:
         task_group.inputs = np.array([task_group.vectorify(job['params'])
                                       for job in jobs
-                                      if job['status'] == 'complete'])
+                                      if job['status'] == 'complete' or job['status'] == 'killed'])
 
         task_group.pending = np.array([task_group.vectorify(job['params'])
                                        for job in jobs
@@ -665,7 +682,7 @@ def load_task_group(db, options, task_names=None):
 
         task_group.values = {task: np.array([job['values'][task]
                                              for job in jobs
-                                             if job['status'] == 'complete'])
+                                             if job['status'] == 'complete' or job['status'] == 'killed'])
                              for task in task_names}
 
         task_group.add_nan_task_if_nans()
