@@ -58,7 +58,7 @@ class TerminationCriterion(object):
     
     def fit(self, y_curr, n):
         self.y_curr = y_curr
-        if len(self.y_prev_list) < self.min_y_prev:
+        if self.min_y_prev > len(self.y_prev_list):
             return False
         for y_idx in range(len(self.y_prev_list)):
             y_prev = self.y_prev_list[y_idx]

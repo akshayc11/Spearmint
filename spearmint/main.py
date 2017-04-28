@@ -454,8 +454,15 @@ def main():
                 if elc_ret['terminate'] is True:
                     sys.stderr.write('Extrapolation wants to terminate job {}.\n'.format(job['id']))
                     job = db.load(experiment_name, 'jobs', {'id': j_id});
-                    job['values'] = 1.0 - elc_ret['predictive_mean']
-                    job['std_dev'] = elc_ret['predictive_std']
+                    result = 1.0 - elc_ret['predictive_mean']
+                    if not isinstance(result, dict):
+                        if np.isnan(result):
+                            result = dict(zip(job['tasks'], [np.nan]*len(job['tasks'])))
+                        elif len(job['tasks']) == 1:
+                            result = {job['tasks'][0]: result}
+                        else:
+                            result = {'main': result}
+                    job['values'] = result
                     save_job(job, db, experiment_name)
                     killed = resource.kill_job(job)
                     if killed is True:
@@ -615,7 +622,7 @@ def get_suggestion(chooser, task_names, db, expt_dir, options, resource_name):
         'submit time': time.time(),
         'start time': None,
         'end time': None,
-        'validation_accs': np.array([]),
+        'validation_accs': None,
         'validation_updated': False,
         'validation check time': -1,
         'y_best': None,
@@ -673,7 +680,6 @@ def load_task_group(db, options, task_names=None):
     jobs = load_jobs(db, options['experiment-name'])
 
     task_group = TaskGroup(task_options, options['variables'])
-
     if jobs:
         task_group.inputs = np.array([task_group.vectorify(job['params'])
                                       for job in jobs
