@@ -326,7 +326,7 @@ def launch(options):
             if set(result.keys()) != set(job['tasks']):
                 raise Exception("Result task names %s did not match job \
                     task names %s." % (result.keys(), job['tasks']))
-
+            
             success = True
         except:
             import traceback
@@ -361,12 +361,41 @@ def launch(options):
         try:
             if job['language'].lower() == 'python':
                 job = db.load(experiment_name, 'jobs', {'id': job_id})
-                validation_accs = python_validation_accs(job)
-                prev_validation_accs = job['validation_accs']
-                if len(prev_validation_accs) < len(validation_accs):
+                result = python_validation_accs(job)
+                if not isinstance(result, dict):
+                    if np.any(np.isnan(result)):
+                        sys.stderr.write('Atleast one of the results has a nan\n')
+                        
+                        r = [np.nan] * len(result)
+                        rs = [np.array(r) for t in job['tasks']]
+                        result = dict(zip(job['tasks'], rs))
+                    elif len(job['tasks']) == 1: # Only one named job
+                        result = {job['tasks'][0]: result}
+                    else:
+                        result = {'main': result}
+                if set(result.keys()) != set(job['tasks']):
+                    raise Exception('Result task names {} did not match job task names {}'.format(
+                        result.keys(), job['tasks']))
+                
+                prev_result = job['validation_accs']
+                
+                updated = False
+                if prev_result is None:
+                    updated = True
+                else:
+                    
+                    for k in prev_result.keys():
+                        if not k in result:
+                            raise Exception('Key {} not found in result'.format(k))
+                        p_v = prev_result[k]
+                        c_v = result[k]
+                        if len(p_v) < len(c_v):
+                            updated = True
+
+                if updated is True:
                     # New validation accs have been found
                     job = db.load(experiment_name, 'jobs', {'id': job_id})
-                    job['validation_accs'] = validation_accs
+                    job['validation_accs'] = result
                     job['validation_updated'] = True
                     db.save(job, experiment_name, 'jobs', {'id': job_id})
             else:
@@ -535,8 +564,10 @@ def python_validation_accs(job):
 
 def python_elc(job, mode, prob_x_greater_type, threshold,
                predictive_std_threshold, nthreads, xlim, prev_jobs = [], min_y_prev=1,
-               recency_weighting=False, monotonicity_condition=False):
-    y_list = np.array(job['validation_accs'])
+               recency_weighting=False, monotonicity_condition=False, task=None):
+    if task is None:
+        task = job['tasks'][0]
+    y_list = np.array(job['validation_accs'][task])
     y_best = job['y_best']
     y_prev_list = [np.array(j['validation_accs']) for j in prev_jobs]
     if mode == 'conservative':

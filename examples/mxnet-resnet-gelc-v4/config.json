@@ -15,7 +15,7 @@
 	"mode": "gelc-conservative",
 	"prob_x_greater_type": "posterior_mean_prob_x_greater_than",
 	"threshold": 0.05,
-	"predictive_std_threshold": 0.001,
+	"predictive_std_threshold": 0.005,
 	"xlim": 300,
 	"nthreads": 4,
 	"min_y_prev": 4,
