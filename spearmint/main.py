@@ -419,7 +419,7 @@ def main():
                     sys.stderr.write("Attempting to dispatch elc job for {}\n".format(job['id']))
 
                     # TODO: get the covariances from the chooser into the job
-                    # job['prev_jobs_cov'] = get_prev_input_covariances(chooser, task_names, db, expt_dir, options, resource_name, job)
+                    # job['prev_jobs_cov'] = get_prev_input_covariances(chooser, db, job)
                     job = db.load(experiment_name, 'jobs', {'id': j_id})
                     #
                     process = elc_resource.attempt_dispatch(experiment_name,
@@ -536,19 +536,22 @@ def remove_broken_jobs(db, jobs, experiment_name, resources):
                     job['status'] = 'broken'
                     save_job(job, db, experiment_name)
 
-# def get_prev_input_covariances(chooser, task_names, db, db, expt_dir, options, resource_name, curr_job):
-#     if len(task_names) == 0:
-#         raise Exception("Error: trying to get covariances for 0 tasks")
-#     expt_name = options['experiment_name']
-#     # Only options for tasks in task_names
-#     task_options = {task: options['tasks'][task] for task in task_names}
+def get_prev_input_covariances(chooser, db, curr_job):
     
-#     # Load the tasks from the database.
-#     task_group = TaskGroup(task_options, options['variables'])
-    
-#     jobs = load_jobs(db, options['experiment-name'])
-#     completed_inputs = 
+    # Load the tasks from the chooser.
+    if not chooser.isFit is True:
+        raise Exception('Cannot be called unless chooser has been fit')
 
+    task_group = chooser.task_group
+    
+    jobs = load_jobs(db, options['experiment-name'])
+    # We only want to compare against jobs that have reached completion
+    completed_job_ids = [job['id'] for job in jobs if job['status'] == 'complete']
+    completed_inputs = np.array([task_group.vectorify(job['params']) for job in jobs if job['status'] == 'complete'])
+
+    curr_input = np.array([task_group.vectorify(curr_job['params'])])
+    covs = chooser.get_cov(completed_inputs, curr_input)
+    
 # TODO: support decoupling i.e. task_names containing more than one task,
 #       and the chooser must choose between them in addition to choosing X
 def get_suggestion(chooser, task_names, db, expt_dir, options, resource_name):
