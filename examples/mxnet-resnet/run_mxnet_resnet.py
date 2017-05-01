@@ -8,7 +8,7 @@ lr_step_epochs = [','.join([str(step_size + step_size*x) for x in range(max_epoc
 lr_step_epochs.append('200,250')
 
 train_cmd ='python train_cifar10_custom.py --gpus 1 --units {} --filter-list {} --lr {} --lr-factor {} --lr-step-epoch {} --kill-time 0'
-out_dir='/data-local/akshayc/Workspace/Software/Spearmint-global/examples/mxnet-resnet/log'
+out_dir='log'
 #mxnet_dir='/home/akshayc/mxnet/example/image-classification'
 
 def get_best_validation_accuracy(out_file_name):
