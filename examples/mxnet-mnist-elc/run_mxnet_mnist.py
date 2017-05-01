@@ -7,7 +7,7 @@ lr_factors = [x * 0.1 for x in range(5,10)]
 max_epochs = 20
 lr_step_epochs = [','.join([str(step_size + step_size*x) for x in range(max_epochs/step_size - 1)]) for step_size in [4,5,10]]
 train_cmd = 'python train_mnist_custom.py --num-layers {} --num-hidden {} --lr {} --lr-factor {} --lr-step-epoch {} --kill-time 0'
-out_dir='/data-local/akshayc/Workspace/Software/Spearmint-global/examples/mxnet-mnist-elc/log'
+out_dir='log'
 # mxnet_dir='/home/akshayc/mxnet/example/image-classification'
 
 def get_best_validation_accuracy(out_file_name):
