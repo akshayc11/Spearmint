@@ -419,6 +419,10 @@ def main():
                     sys.stderr.write("Attempting to dispatch elc job for {}\n".format(job['id']))
 
                     # TODO: get the covariances from the chooser into the job
+                    get_prev_input_covariances(chooser, db, job)
+                    c_jobs = [j for j in load_jobs(db, experiment_name) if j['status']=='complete']
+                    if len(c_jobs) > 2:
+                        break
                     # job['prev_jobs_cov'] = get_prev_input_covariances(chooser, db, job)
                     job = db.load(experiment_name, 'jobs', {'id': j_id})
                     #
@@ -558,6 +562,7 @@ def get_prev_input_covariances(chooser, db, curr_job):
 
     curr_input = np.array([task_group.vectorify(curr_job['params'])])
     covs = chooser.get_cov(completed_inputs, curr_input)
+    print 'num_completed: {}, covs:{}'.format(len(completed_job_ids, covs))
     
 # TODO: support decoupling i.e. task_names containing more than one task,
 #       and the chooser must choose between them in addition to choosing X
