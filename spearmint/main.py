@@ -736,7 +736,10 @@ def load_task_group(db, options, task_names=None):
 
 #     best_job_fh.close()
 
-def clean_last_job(config_file):
+def clean_last_job(expt_dir,config_filename=None):
+    if config_filename is None:
+        config_filename='config.json'
+    config_file='{}/{}'.format(expt_dir, config_filename)
     f = open(config_file)
     options = json.load(f)
     expt_name = options['experiment-name']
@@ -747,7 +750,7 @@ def clean_last_job(config_file):
     hypers = load_hypers(db, expt_name)
     print jobs
     jobs = jobs[0:-1]
-    cleanup.cleanup('../examples/mxnet-mnist-elc')
+    cleanup.cleanup(expt_dir)
     for j in jobs:
         save_job(j, db, expt_name)
 

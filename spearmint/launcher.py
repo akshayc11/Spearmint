@@ -569,7 +569,7 @@ def python_elc(job, mode, prob_x_greater_type, threshold,
         task = job['tasks'][0]
     y_list = np.array(job['validation_accs'][task])
     y_best = job['y_best']
-    y_prev_list = [np.array(j['validation_accs']) for j in prev_jobs]
+    y_prev_list = [np.array(j['validation_accs'][task]) for j in prev_jobs]
     if mode == 'conservative':
         term_crit = ConservativeTerminationCriterion(
             y_list, xlim, nthreads, prob_x_greater_type,
