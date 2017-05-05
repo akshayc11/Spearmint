@@ -222,7 +222,7 @@ def truncate_inputs(func):
     return inner
 
 class KumarWarp(AbstractTransformation):
-    def __init__(self, num_dims, alpha=None, beta=None, name="BetaWarp"):
+    def __init__(self, num_dims, alpha=None, beta=None, name="KumarWarp"):
         self.name     = name
         self.num_dims = num_dims
 
@@ -243,14 +243,18 @@ class KumarWarp(AbstractTransformation):
 
         assert self.alpha.value.shape[0] == self.num_dims and self.beta.value.shape[0] == self.num_dims
 
+    def __repr__(self):
+        return "Transform: {} numdims: {} alpha: {} beta: {}".format(self.name, self.num_dims, self.alpha, self.beta)
     @property
     def hypers(self):
         return (self.alpha, self.beta)
 
     @truncate_inputs
-    def forward_pass(self, inputs):
+    def forward_pass(self, inputs, debug=False):
         self._inputs = inputs
         x = _kumaraswamy_cdf(inputs, self.alpha.value, self.beta.value)
+        if debug:
+            print self.__repr__(), 'input:', inputs, 'op:', x
         assert(np.all(np.isfinite(x)))
 
         return x

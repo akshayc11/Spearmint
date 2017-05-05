@@ -194,7 +194,7 @@ class AbstractTransformation(object):
         return None
 
     @abstractmethod
-    def forward_pass(self, inputs):
+    def forward_pass(self, inputs, debug=False):
         pass
 
     @abstractmethod

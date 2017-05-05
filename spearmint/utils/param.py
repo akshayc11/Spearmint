@@ -275,3 +275,6 @@ class Param(object):
             print '    %s: %s' % (self.name, self.value)
         else:
             print '    %s: min=%s, max=%s (size=%d)' % (self.name, self.value.min(), self.value.max(), self.size())
+
+    def __repr__(self):
+        return 'Param: {} value: {} prior: {}'.format(self.name, self.value, self.prior)

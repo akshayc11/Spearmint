@@ -209,6 +209,9 @@ class Matern52(AbstractKernel):
 
         assert self.ls.value.shape[0] == self.num_dims
 
+    def __repr__(self):
+        return "Kernel: {} numdims: {} ls: {}".format(self.name, self.num_dims, self.ls)
+
     @property
     def hypers(self):
         return self.ls
@@ -219,10 +222,12 @@ class Matern52(AbstractKernel):
     def diag_cov(self, inputs):
         return np.ones(inputs.shape[0])
 
-    def cross_cov(self, inputs_1, inputs_2):
+    def cross_cov(self, inputs_1, inputs_2, debug=False):
         r2  = np.abs(kernel_utils.dist2(self.ls.value, inputs_1, inputs_2))
         r   = np.sqrt(r2)
         cov = (1.0 + SQRT_5*r + (5.0/3.0)*r2) * np.exp(-SQRT_5*r)
+        if debug:
+            print self.__repr__(), 'i1:', inputs_1, 'i2:', inputs_2, 'cov:', cov
 
         return cov
 

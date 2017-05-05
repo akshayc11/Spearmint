@@ -208,6 +208,9 @@ class productCov:
         # This indexes the dimensions on which each kernel operates
         self.dim_indices = kwargs.get('dim_indices', list())
         
+    def __repr__(self):
+        return "Kernel: ProductCov: dim_indices:{} kernels:{}".format(self.dim_indices, self.kernels)
+
     def kernel(self, x1, x2=None, grad=False):
         if x2 is None:
             x2 = x1

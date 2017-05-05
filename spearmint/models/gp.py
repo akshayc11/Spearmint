@@ -254,6 +254,7 @@ class GP(AbstractModel):
         self._samplers                   = []
         self._use_mean_if_single_fantasy = True
         
+        self._input_kernel      = None
         self._kernel            = None
         self._kernel_with_noise = None
 
@@ -321,9 +322,9 @@ class GP(AbstractModel):
         transformer.add_layer(beta_warp)
 
         # Build the component kernels
-        input_kernel           = Matern52(self.num_dims)
+        self._input_kernel     = Matern52(self.num_dims)
         stability_noise_kernel = Noise(self.num_dims) # Even if noiseless we use some noise for stability
-        scaled_input_kernel    = Scale(input_kernel)
+        scaled_input_kernel    = Scale(self._input_kernel)
         sum_kernel             = SumKernel(scaled_input_kernel, stability_noise_kernel)
         noise_kernel           = Noise(self.num_dims)
 
@@ -342,7 +343,7 @@ class GP(AbstractModel):
         )
 
         # Get the hyperparameters to sample
-        ls                      = input_kernel.hypers
+        ls                      = self._input_kernel.hypers
         amp2                    = scaled_input_kernel.hypers
         beta_alpha, beta_beta = beta_warp.hypers
 
@@ -475,6 +476,30 @@ class GP(AbstractModel):
         self._set_params_from_dict(gp_dict['hypers'])
         self.chain_length = gp_dict['chain length']
 
+    def get_cov(self, prev_inputs, curr_input, debug=False):
+        """ Return the covariance matrix between all the previous inputs,
+        and the current inputs of interest
+        This is required for the new elchp paradigm. In this, we do not make any modifications
+        to the GP as it stands. Only get the covariance. This should not disturb the GP in any way.
+        prev_inputs: 2d array:
+            matrix of all previous inputs of interest.
+        curr_input: 2d array:
+            matrix of all current inputs of interest.
+        hypers: dict
+            initial value for the hyper-parameters
+        return:
+        cand_cross: 2d array (covariance of curr_input against all prev inputs) 
+        """
+        # Get the current inputs stored in the GP
+        if prev_inputs.shape[1] != self.num_dims:
+            raise Exception('Dimensionality of prev inputs must match dimensionality at init time')
+
+        if curr_input.shape[1] != self.num_dims:
+            raise Exception("Dimensionality of curr_input must match dimensionality given at init time.")
+
+        cand_cross = self._input_kernel.cross_cov(curr_input, prev_inputs, debug=debug)
+        return cand_cross.flatten()
+        
     def fit(self, inputs, values, pending=None, hypers=None, reburn=False, fit_hypers=True):
         """return a set of hyperparameters after fitting the GP to the input and values
         

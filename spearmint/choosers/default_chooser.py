@@ -185,6 +185,7 @@
 
 import sys
 import numpy          as np
+np.set_printoptions(precision=5)
 import numpy.random   as npr
 import scipy.optimize as spo
 import multiprocessing
@@ -204,7 +205,7 @@ DEFAULT_NUMDESIGN = 2
 DEFAULT_NUMSPRAY  = 10
 DEFAULT_SPRAYSTD  = 1e-3
 
-VERBOSE = False
+VERBOSE = True
 
 
 def init(options):
@@ -313,6 +314,40 @@ class DefaultChooser(object):
 
         return new_hypers
 
+    def get_cov(self, prev_inputs, curr_inputs, objective_name=None, debug=False):
+        """Get the covariance matrix for a curr_input given prev_inputs
+        prev_inputs: 2d array
+            previous inputs of interest
+        curr_input: 2d array
+            current input of interest
+        objective_name: string
+            objective who's model we are using for getting the covariance matrix
+        
+        returns cand_cov: 2d array
+            cross covariance of curr_input against all prev_inputs.
+        """
+        if not self.isFit:
+            raise Exception("You must call fit() before calling suggest()")
+        
+        if objective_name is not None:
+            if objective_name not in self.models:
+                raise Exception('Objective name {} does not exist in the models'.format(objective_name))
+        else:
+            # Take only the default objective name
+            objective_name = self.objective['name']
+        obj_task = self.task_group.tasks[objective_name]
+        if  obj_task.valid_values.shape[0] >= DEFAULT_NUMDESIGN:
+            obj_model = self.models[objective_name]
+            prev_ips = np.array([self.task_group.to_unit(self.task_group.vectorify(x)) for x in prev_inputs])
+            curr_ips = np.array([self.task_group.to_unit(self.task_group.vectorify(x)) for x in curr_inputs])
+            # print 'prev_ips:'
+            # print(prev_ips)
+            # print 'curr_ips:'
+            # print(curr_ips)
+            return obj_model.get_cov(prev_ips, curr_ips, debug=debug)
+        else:
+            return np.array([])
+
     def suggest(self):
         sys.stderr.write('Getting suggestion...\n')
         assert not np.any(self.grid < 0)
@@ -391,14 +426,20 @@ class DefaultChooser(object):
             print 'Suggested input %s' % cand[best_opt_ind]
 
         if best_opt_ei >= best_grid_ei:
+            if VERBOSE:
+                print 'Candidate suggestion seems to be better than grid suggestion'
             suggestion = cand[best_opt_ind]
         else:
+            if VERBOSE:
+                print 'Candidate suggestion seems to be worse than grid suggestion'
             suggestion = grid_pred[best_grid_ind]
 
         # Make sure BFGS didn't do anything weird with the boudns
         suggestion[suggestion > 1] = 1.0
         suggestion[suggestion < 0] = 0.0
 
+        if VERBOSE:
+            print 'Final Suggestion: {}'.format(suggestion)
         suggestion = self.task_group.from_unit(suggestion)
 
         sys.stderr.write("\nSuggestion:     ")

@@ -196,14 +196,20 @@ class IgnoreDims(AbstractTransformation):
 
         self.validate_ign()
 
+    def __repr__(self):
+        return "Transform: {} numdims:{} ign:{}".format(self.name, self.numdims, self.ign)
+
     def validate_ign(self):
         assert len(set(self.ign)) == len(self.ign), 'Each index may only be used once.'
         assert max(self.ign) < self.num_dims, 'Maximum index exceeds number of dimensions.'
 
-    def forward_pass(self, inputs):
+    def forward_pass(self, inputs, debug=False):
+
         new_inputs = inputs.copy()
         
         new_inputs[:,self.ign] = 0.0
+        if debug:
+            print self.__repr__(), 'inputs:', inputs, 'op:', new_inputs
 
         return new_inputs
 

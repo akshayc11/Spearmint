@@ -246,7 +246,7 @@ class Transformer(object):
         assert np.array(counts.keys()).max() < self.num_dims, 'Maximum index exceeds number of dimensions.'
         assert all([count == 1 for count in counts.values()]), 'Each index may only be used once.'
 
-    def forward_pass(self, inputs):
+    def forward_pass(self, inputs, debug=False):
         assert self.layer_transformations, 'Transformer should contain transformations.'
         
         prev_layer = inputs

@@ -191,7 +191,7 @@ import time
 from collections import OrderedDict
 
 import numpy as np
-
+np.set_printoptions(precision=5)
 try:
     import simplejson as json
 except ImportError:
@@ -419,10 +419,8 @@ def main():
                     sys.stderr.write("Attempting to dispatch elc job for {}\n".format(job['id']))
 
                     # TODO: get the covariances from the chooser into the job
-                    get_prev_input_covariances(chooser, db, job)
+                    get_prev_input_covariances(chooser, options, db, job)
                     c_jobs = [j for j in load_jobs(db, experiment_name) if j['status']=='complete']
-                    if len(c_jobs) > 2:
-                        break
                     # job['prev_jobs_cov'] = get_prev_input_covariances(chooser, db, job)
                     job = db.load(experiment_name, 'jobs', {'id': j_id})
                     #
@@ -547,7 +545,7 @@ def remove_broken_jobs(db, jobs, experiment_name, resources):
                     job['status'] = 'broken'
                     save_job(job, db, experiment_name)
 
-def get_prev_input_covariances(chooser, db, curr_job):
+def get_prev_input_covariances(chooser, options, db, curr_job):
     
     # Load the tasks from the chooser.
     if not chooser.isFit is True:
@@ -558,11 +556,12 @@ def get_prev_input_covariances(chooser, db, curr_job):
     jobs = load_jobs(db, options['experiment-name'])
     # We only want to compare against jobs that have reached completion
     completed_job_ids = [job['id'] for job in jobs if job['status'] == 'complete']
-    completed_inputs = np.array([task_group.vectorify(job['params']) for job in jobs if job['status'] == 'complete'])
+    completed_inputs = [job['params'] for job in jobs if job['status'] == 'complete']
 
-    curr_input = np.array([task_group.vectorify(curr_job['params'])])
-    covs = chooser.get_cov(completed_inputs, curr_input)
-    print 'num_completed: {}, covs:{}'.format(len(completed_job_ids, covs))
+    curr_input = [curr_job['params']]
+    covs = chooser.get_cov(curr_input, completed_inputs, debug=False)
+    
+    print 'num_completed: {}, covs:{}'.format(len(completed_job_ids), covs)
     
 # TODO: support decoupling i.e. task_names containing more than one task,
 #       and the chooser must choose between them in addition to choosing X

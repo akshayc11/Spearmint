@@ -203,6 +203,8 @@ class Noise(AbstractKernel):
 
         self.noise = noise if noise is not None else default_noise
 
+    def __repr__(self):
+        return "Kernel: {} numdims:{} noise: {}".format(self.name, self.num_dims, self.noise)
     @property
     def hypers(self):
         return self.noise
@@ -213,9 +215,11 @@ class Noise(AbstractKernel):
     def diag_cov(self, inputs):
         return self.noise.value*np.ones(inputs.shape[0])
 
-    def cross_cov(self, inputs_1, inputs_2):
-        return np.zeros((inputs_1.shape[0],inputs_2.shape[0]))
-
+    def cross_cov(self, inputs_1, inputs_2, debug=False):
+        cov = np.zeros((inputs_1.shape[0],inputs_2.shape[0]))
+        if debug:
+            print self.__repr__(), 'i1:', inputs_1, 'i2:', inputs_2, 'cov:', cov
+        return cov 
     def cross_cov_grad_data(self, inputs_1, inputs_2):
        return np.zeros((inputs_1.shape[0],inputs_2.shape[0],self.num_dims))
 

@@ -201,6 +201,9 @@ class NormLin(AbstractTransformation):
         self._norm = Normalization(num_dims)
         self._proj = Linear(num_dims, num_factors=num_factors)
 
+    def __repr__(self):
+        return "Transform: {} num_dims: {} norm: {} proj: {}".format(self.name, self.num_dims, self._norm, self._proj)
+
     @property
     def hypers(self):
         return self._proj.hypers
@@ -208,10 +211,11 @@ class NormLin(AbstractTransformation):
     def output_num_dims(self):
         return self._proj.output_num_dims()
 
-    def forward_pass(self, inputs):
-        norm_inputs = self._norm.forward_pass(inputs)
-        proj_inputs = self._proj.forward_pass(norm_inputs)
-
+    def forward_pass(self, inputs, debug=False):
+        norm_inputs = self._norm.forward_pass(inputs, debug=debug)
+        proj_inputs = self._proj.forward_pass(norm_inputs, debug=debug)
+        if debug:
+            print self.__repr__(), 'input:', inputs, 'op:', proj_inputs
         return proj_inputs
 
     def backward_pass(self, V):

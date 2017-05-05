@@ -207,6 +207,9 @@ class Linear(AbstractTransformation):
 
         self.weights = weights if weights is not None else default_weights
 
+    def __repr__(self):
+        return "Transform: {} num_dims: {} num_factors: {} weights: {}".format(self.name, self.num_dims, self.num_factors, self.weights)
+
     @property
     def hypers(self):
         return self.weights
@@ -218,8 +221,12 @@ class Linear(AbstractTransformation):
     def output_num_dims(self):
         return self.num_factors
 
-    def forward_pass(self, inputs):
-        return inputs.dot(self.W)
+    def forward_pass(self, inputs, debug=False):
+        x = inputs.dot(self.W)
+
+        if debug:
+            print self.__repr__(), 'input:', inputs, 'op:', x
+        return x
 
     def backward_pass(self, V):
         return V.dot(self.W.T)

@@ -295,3 +295,6 @@ class TaskGroup(object):
         """remove the scaling for the parameters that keeps them in [0,1)""" 
         return self.dummy_task.from_unit(U)
 
+    def to_unit(self, v):
+        """Add the scaleing for the parameters that keeps them in [0,1)"""
+        return self.dummy_task.to_unit(v)

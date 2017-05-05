@@ -202,7 +202,7 @@ class AbstractKernel(object):
         pass
 
     @abstractmethod
-    def cross_cov(self, inputs_1, inputs_2):
+    def cross_cov(self, inputs_1, inputs_2, debug=False):
         pass
 
     @abstractmethod

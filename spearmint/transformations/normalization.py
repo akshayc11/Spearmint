@@ -208,15 +208,20 @@ def truncate_inputs(func):
 
 class Normalization(AbstractTransformation):
     def __init__(self, num_dims, name="Normalization"):
+        self.name = name
         self.num_dims = num_dims
         assert num_dims > 1, 'Cannot normalize a single value.'
 
+    def __repr__(self):
+        print "Transform: {} num_dims: {}".format(self.name, self.num_dims)
+    
     @truncate_inputs
     def forward_pass(self, inputs):
         self._inputs = inputs
-
-        return (inputs+EPSILON) / (inputs+EPSILON).sum(1)[:,None]
-
+        op = (inputs+EPSILON) / (inputs+EPSILON).sum(1)[:,None]
+        if debug:
+            print self.__repr__(), 'inputs:', inputs, 'op:', op
+        return op
     def backward_pass(self, V):
         s = (self._inputs+EPSILON).sum(1)
         if V.ndim == 2:

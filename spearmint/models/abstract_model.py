@@ -209,6 +209,10 @@ class AbstractModel(object):
     def predict(self, pred, full_cov=False, compute_grad=False):
         pass
 
+    @abstractmethod
+    def get_cov(self, prev_inputs, curr_input):
+        pass
+
     def function_over_hypers(self, fun, *fun_args, **fun_kwargs):
         """Compute the function fun while averaging over the stored hyperparameter samples of multiple models. 
         """

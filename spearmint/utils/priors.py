@@ -215,6 +215,9 @@ class Tophat(AbstractPrior):
         if not (xmax > xmin):
             raise Exception("xmax must be greater than xmin")
 
+    def __repr__(self):
+        return 'TopHat: xmin:{} xmax:{}'.format(self.xmin, self.xmax)
+
     def logprob(self, x):
         if np.any(x < self.xmin) or np.any(x > self.xmax):
             return -np.inf
@@ -233,6 +236,9 @@ class Tophat(AbstractPrior):
 class Horseshoe(AbstractPrior):
     def __init__(self, scale):
         self.scale = scale
+
+    def __repr__(self):
+        return 'Prior: Horseshoe: scale: {}'.format(self.scale)
 
     # THIS IS INEXACT
     def logprob(self, x):
@@ -256,6 +262,9 @@ class Lognormal(AbstractPrior):
         self.scale = scale
         self.mean = mean
 
+    def __repr__(self):
+        return "Prior: Lognormal: scale:{} mean: {}".format(self.scale, self.mean)
+
     def logprob(self, x):
         return np.sum(sps.lognorm.logpdf(x, self.scale, loc=self.mean))
 
@@ -272,6 +281,9 @@ class LognormalTophat(AbstractPrior):
         if not (xmax > xmin):
             raise Exception("xmax must be greater than xmin")
 
+    def __repr__(self):
+        return "Prior: LognormalTophat: scale: {} mean: {} xmin: {} xmax: {} super: {}".format(self.scale, self.mean, self.xmin, self.xmax)
+
     def logprob(self, x):
         if np.any(x < self.xmin) or np.any(x > self.xmax):
             return -np.inf
@@ -283,6 +295,9 @@ class LognormalTophat(AbstractPrior):
 
 # Let X~lognormal and Y=X^2. This is distribution of Y.
 class LognormalOnSquare(Lognormal):
+    def __repr__(self):
+        return "Prior: LognormalOnSquare: super:{}".format(super(Lognormal, self).__repr__())
+
     def logprob(self, y):
         if np.any(y < 0): # Need this here or else sqrt(y) may occur with y < 0
             return -np.inf
@@ -301,12 +316,18 @@ class LogLogistic(AbstractPrior):
         self.shape = shape
         self.scale = scale
 
+    def __repr__(self):
+        return "Prior: LogLogistic: shape: {} scale: {}".format(self.shape, self.scale)
+
     def logprob(self, x):
         return np.sum(sps.fisk.logpdf(x, self.shape, scale=self.scale))
 
 class Exponential(AbstractPrior):
     def __init__(self, mean):
         self.mean = mean
+
+    def __repr__(self):
+        return "Prior: Exponential: mean: {}".format(self.mean)
 
     def logprob(self, x):
         return np.sum(sps.expon.logpdf(x, scale=self.mean))
@@ -320,6 +341,9 @@ class Gaussian(AbstractPrior):
     def __init__(self, mu, sigma):
         self.mu    = mu
         self.sigma = sigma
+    
+    def __repr__(self):
+        return "Prior: Gaussian mu:{} sigma:{}".format(self.mu, self.sigma)
 
     def logprob(self, x):
         return np.sum(sps.norm.logpdf(x, loc=self.mu, scale=self.sigma))
@@ -335,6 +359,9 @@ class MultivariateNormal(AbstractPrior):
         if mu.size != cov.shape[0] or cov.shape[0] != cov.shape[1]:
             raise Exception("mu should be a vector and cov a matrix, of matching sizes")
 
+    def __repr__(self):
+        return "Prior: MultivariateNormal: mu:{} sigma:{}".format(self.mu, self.sigma)
+
     def logprob(self, x):
         return sps.multivariate_normal.logpdf(x, mean=self.mu, cov=self.cov)
 
@@ -344,6 +371,9 @@ class MultivariateNormal(AbstractPrior):
 class NoPrior(AbstractPrior):
     def __init__(self):
         pass
+
+    def __repr__(self):
+        return "Prior: NoPrior"
 
     def logprob(self, x):
         return 0.0
@@ -356,6 +386,9 @@ class NonNegative(AbstractPrior):
 
         if hasattr(prior, 'sample'):
             self.sample = lambda n_samples: np.abs(self.prior.sample(n_samples))
+    
+    def __repr__(self):
+        return "Prior: NonNegative: {}".format(self.prior)
 
     def logprob(self, x):
         if np.any(x <= 0): 
@@ -371,6 +404,9 @@ class NonNegative(AbstractPrior):
 class ProductOfPriors(AbstractPrior):
     def __init__(self, priors):
         self.priors = priors
+
+    def __repr__(self):
+        return "Prior: ProductOfPriors: {}".format(self.priors)
 
     def logprob(self, x):
         lp = 0.0

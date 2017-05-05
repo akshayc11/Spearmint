@@ -196,16 +196,23 @@ class TransformKernel(AbstractKernel):
         self.kernel      = kernel
         self.transformer = transformer
 
+    def __repr__(self):
+        return "Kernel: {} kernel:{} transformer:{}".format(self.name, self.kernel, self.transformer)
+
     def cov(self, inputs):
         return self.kernel.cov(self.transformer.forward_pass(inputs))
 
     def diag_cov(self, inputs):
         return self.kernel.diag_cov(self.transformer.forward_pass(inputs))
 
-    def cross_cov(self, inputs_1, inputs_2):
-        return self.kernel.cross_cov(self.transformer.forward_pass(inputs_1),
-                self.transformer.forward_pass(inputs_2))
+    def cross_cov(self, inputs_1, inputs_2, debug=False):
+        cov = self.kernel.cross_cov(self.transformer.forward_pass(inputs_1, debug=debug),
+                                     self.transformer.forward_pass(inputs_2, debug=debug), debug=debug)
 
+        if debug:
+            print self.__repr__(), 'i1: {} i2: {}, cov: {}'.format(inputs_1, inputs_2, cov)
+        
+        return cov
     # This is the gradient wrt **inputs_2**
     def cross_cov_grad_data(self, inputs_1, inputs_2):
         # NOTE: The ordering is very important here. The forward pass

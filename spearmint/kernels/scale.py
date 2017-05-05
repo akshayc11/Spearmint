@@ -201,6 +201,9 @@ class Scale(AbstractKernel):
 
         self.amp2 = amp2 if amp2 is not None else default_amp2
 
+    def __repr__(self):
+        return "Kernel: {} kernel:{} amp2: {}".format(self.name, self.kernel, self.amp2)
+
     @property
     def hypers(self):
         return self.amp2
@@ -211,9 +214,12 @@ class Scale(AbstractKernel):
     def diag_cov(self, inputs):
         return self.amp2.value*self.kernel.diag_cov(inputs)
 
-    def cross_cov(self, inputs_1, inputs_2):
-        return self.amp2.value*self.kernel.cross_cov(inputs_1,inputs_2)
+    def cross_cov(self, inputs_1, inputs_2, debug=False):
+        cov = self.amp2.value*self.kernel.cross_cov(inputs_1,inputs_2,debug=debug)
+        if debug:
+            print self.__repr__(), 'i1: {} i2: {} cov: {}'.format(inputs_1, inputs_2, cov)
 
+        return cov
     # This is the gradient wrt **inputs_2**
     def cross_cov_grad_data(self, inputs_1, inputs_2):
         return self.amp2.value*self.kernel.cross_cov_grad_data(inputs_1,inputs_2)

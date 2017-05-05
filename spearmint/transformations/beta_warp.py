@@ -234,15 +234,22 @@ class BetaWarp(AbstractTransformation):
 
         assert self.alpha.value.shape[0] == self.num_dims and self.beta.value.shape[0] == self.num_dims
 
+        
+    def __repr__(self):
+        return "Transform: {} numdims:{} alpha:{} beta:{}".format(self.name, self.numdims. self.alpha, self.beta)
+
     @property
     def hypers(self):
         return (self.alpha, self.beta)
 
     @truncate_inputs
-    def forward_pass(self, inputs):
+    def forward_pass(self, inputs, debug=False):
         self._inputs = inputs
+        op = sps.beta.cdf(inputs, self.alpha.value, self.beta.value)
+        if debug:
+            print self.__repr__(), 'ip:', inputs, 'op:', op
 
-        return sps.beta.cdf(inputs, self.alpha.value, self.beta.value)
+        return op
 
     def backward_pass(self, V):
         dx = sps.beta.pdf(self._inputs, self.alpha.value, self.beta.value)

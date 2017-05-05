@@ -190,14 +190,20 @@ class SumKernel(AbstractKernel):
     def __init__(self, *kernels):
         self.kernels = kernels
 
+    def __repr__(self):
+        return "Kernel: SumKernel kernels:{}".format(self.kernels)
+
     def cov(self, inputs):
         return reduce(lambda K1, K2: K1+K2, [kernel.cov(inputs) for kernel in self.kernels])
 
     def diag_cov(self, inputs):
         return reduce(lambda K1, K2: K1+K2, [kernel.diag_cov(inputs) for kernel in self.kernels])
 
-    def cross_cov(self, inputs_1, inputs_2):
-        return reduce(lambda K1, K2: K1+K2, [kernel.cross_cov(inputs_1,inputs_2) for kernel in self.kernels])
+    def cross_cov(self, inputs_1, inputs_2, debug=False):
+        cov = reduce(lambda K1, K2: K1+K2, [kernel.cross_cov(inputs_1,inputs_2, debug=debug) for kernel in self.kernels])
+        if debug:
+            print self.__repr__(), 'i1: {} i2: {} cov: {}'.format(inputs_1, inputs_2, cov)
+        return cov
 
     # This is the gradient wrt **inputs_2**
     def cross_cov_grad_data(self, inputs_1, inputs_2):
