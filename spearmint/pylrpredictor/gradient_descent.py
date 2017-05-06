@@ -24,6 +24,9 @@ def gradient_descent(f_cs, f_ps,
                      lambda_3=1,
                      lambda_4=1,
                      lambda_5=5,
+                     lambda_hp=0.0,
+                     scale_hp=1,
+                     f_p_cov=None,
                      return_loss=False,
                      a_0=None,
                      b_0=None,
@@ -31,7 +34,6 @@ def gradient_descent(f_cs, f_ps,
                      monotonicity_condition=False,
                      f_c_max=None,
                      f_p_max=None):
-    lambda_6=0
     if monotonicity_condition is True:
         assert f_c_max is not None and f_p_max is not None, "Need f_c_max and f_p_max to check monotonicity condition"
         lambda_6=1
@@ -48,7 +50,10 @@ def gradient_descent(f_cs, f_ps,
         b = random.random() - 0.5
     else:
         b = b_0
-    
+
+    if f_p_cov is None:
+        f_p_cov = 1.0 / scale_hp
+
     n = len(f_cs)
     f_cap_cs = a * f_ps + b
     try:
@@ -67,7 +72,7 @@ def gradient_descent(f_cs, f_ps,
             b = b - alpha * dL_db
         f_cap_cs = a*f_ps + b
         residuals = f_cs - f_cap_cs
-        loss = np.linalg.norm(residuals)/n
+        loss = (np.linalg.norm(residuals)/n) - lambda_hp*math.log(scale_hp * f_p_cov)
         
         if return_loss is True:
             return a, b, loss

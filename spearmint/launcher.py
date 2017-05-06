@@ -193,6 +193,7 @@ from spearmint.utils.database.mongodb import MongoDB
 from spearmint.pylrpredictor.terminationcriterion import \
     ConservativeTerminationCriterion, OptimisticTerminationCriterion
 from spearmint.pylrpredictor.prevonlyterminationcriterion import ConservativeTerminationCriterion as GelcConservativeTerminationCriterion
+from spearmint.pylrpredictor.prevonlyhpterminationcriterion import ConservativeTerminationCriterion as GelcHpConservativeTerminationCriterion
 
 def main():
     parser = argparse.ArgumentParser(description="usage: %prog [options]")
@@ -569,7 +570,11 @@ def python_elc(job, mode, prob_x_greater_type, threshold,
         task = job['tasks'][0]
     y_list = np.array(job['validation_accs'][task])
     y_best = job['y_best']
+    y_prev_ids =[j['id'] for j in prev_jobs]
     y_prev_list = [np.array(j['validation_accs'][task]) for j in prev_jobs]
+    y_covs_list = job['cov_list']
+    y_cov_ids = job['cov_ids']
+    y_cov_list = [y_covs_list[y_cov_ids.index(jid)] for jid in y_prev_ids]
     if mode == 'conservative':
         term_crit = ConservativeTerminationCriterion(
             y_list, xlim, nthreads, prob_x_greater_type,
@@ -587,8 +592,18 @@ def python_elc(job, mode, prob_x_greater_type, threshold,
             min_y_prev=min_y_prev,
             recency_weighting=recency_weighting,
             monotonicity_condition=monotonicity_condition)
+    elif mode == 'gelc-hp-conservative':
+        term_crit = GelcHpConservativeTerminationCriterion(
+            y_list, xlim,
+            prob_x_greater_type=prob_x_greater_type,
+            y_prev_list=y_prev_list,
+            predictive_std_threshold=predictive_std_threshold,
+            min_y_prev=min_y_prev,
+            recency_weighting=recency_weighting,
+            monotonicity_condition=monotonicity_condition,
+            y_cov_list=y_cov_list)
     else:
-        raise Exception("Invalid mode for ELC")
+        raise Exception("Invalid mode for ELC: {}".format(mode))
     result = term_crit.run(y_best, threshold=threshold)
     return result
 

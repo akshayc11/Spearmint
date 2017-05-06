@@ -44,8 +44,9 @@ def parse_elc_config(elc_resource_config=None):
     else:
         assert elc_resource_config['mode'] == 'conservative' or \
             elc_resource_config['mode'] == 'optimistic' or \
-            elc_resource_config['mode'] == 'gelc-conservative', 'mode should be \
-            conservative or optimistic'
+            elc_resource_config['mode'] == 'gelc-conservative' or \
+            elc_resource_config['mode'] == 'gelc-hp-conservative', 'mode should be \
+            conservative or optimistic or gelc-conservative or gelc-hp-conservative'
 
     if 'prob_x_greater_type' not in elc_resource_config:
         elc_resource_config['prob_x_greater_type'] = \

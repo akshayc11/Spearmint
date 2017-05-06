@@ -35,9 +35,11 @@ class TerminationCriterion(object):
     min_y_prev = None
     recency_weighting = None
     monotonicity_condition = None
+    y_cov_list=None
     def __init__(self, y_curr, xlim, prob_x_greater_type=None,
                  y_prev_list=[], n=100, predictive_std_threshold=PREDICTIVE_STD_THRESHOLD,
-                 min_y_prev=1, recency_weighting=False, monotonicity_condition=True):
+                 min_y_prev=1, recency_weighting=False, monotonicity_condition=True,
+                 y_cov_list=[]):
         """
         Constructor for the TerminationCriterion
         """
@@ -51,8 +53,9 @@ class TerminationCriterion(object):
         self.min_y_prev = min_y_prev
         self.recency_weighting = recency_weighting
         self.monotonicity_condition = monotonicity_condition
+        self.y_cov_list = y_cov_list
         self.has_fit = self.fit(y_curr, n)
-        
+
     def get_prediction(self, xlim=None, thin=None):
         return self.predict(xlim=xlim)
     
@@ -62,7 +65,8 @@ class TerminationCriterion(object):
             return False
         for y_idx in range(len(self.y_prev_list)):
             y_prev = self.y_prev_list[y_idx]
-            a_b_losses = self.__get_gradients_and_losses(y_curr, y_prev, n=n)
+            y_cov = self.y_cov_list[y_idx]
+            a_b_losses = self.__get_gradients_and_losses(y_curr, y_prev, n=n, y_cov=y_cov)
             for a_b_loss in a_b_losses:
                 self.a_b_losses.append(a_b_loss + (y_idx,))
         self.a_b_losses = sorted(self.a_b_losses, key=lambda x:x[2])[0:n]
@@ -126,7 +130,7 @@ class TerminationCriterion(object):
         """
         pass
 
-    def __get_gradients_and_losses(self, f_cs, f_ps, n=100):
+    def __get_gradients_and_losses(self, f_cs, f_ps, n=100, y_cov=1.0):
         """
         This is a wrapper for the kind of gradient descent this
         termination criterion going to use. In this case, we will
@@ -139,7 +143,8 @@ class TerminationCriterion(object):
         a_b_losses = []
         for i in xrange(int(2*n)):
             a_b_loss = gradient_descent(f_c, f_p, return_loss=True,
-                                        recency_weighting=self.recency_weighting)
+                                        recency_weighting=self.recency_weighting,
+                                        lambda_hp=1.0, f_p_cov=y_cov)
             if self.monotonicity_condition is True:
                 a,b,loss = a_b_loss
                 f_c_pred_fin = a * f_ps[-1] + b
@@ -160,13 +165,15 @@ class ConservativeTerminationCriterion(TerminationCriterion):
                  predictive_std_threshold=None,
                  min_y_prev=1,
                  recency_weighting=False,
-                 monotonicity_condition=True):
+                 monotonicity_condition=True,
+                 y_cov_list=[]):
         super(ConservativeTerminationCriterion, self).__init__(
             y_curr, xlim, prob_x_greater_type,
             y_prev_list=y_prev_list, n=n, min_y_prev=min_y_prev,
             recency_weighting=recency_weighting,
             monotonicity_condition=monotonicity_condition,
-            predictive_std_threshold=predictive_std_threshold)
+            predictive_std_threshold=predictive_std_threshold,
+            y_cov_list=y_cov_list)
     
     def run(self, y_best, threshold=IMPROVEMENT_PROB_THRESHOLD):
         """

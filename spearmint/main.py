@@ -419,11 +419,13 @@ def main():
                     sys.stderr.write("Attempting to dispatch elc job for {}\n".format(job['id']))
 
                     # TODO: get the covariances from the chooser into the job
-                    get_prev_input_covariances(chooser, options, db, job)
-                    c_jobs = [j for j in load_jobs(db, experiment_name) if j['status']=='complete']
-                    # job['prev_jobs_cov'] = get_prev_input_covariances(chooser, db, job)
+                    prev_ids, cov_list = get_prev_input_covariances(chooser, options, db, job)
+                    
                     job = db.load(experiment_name, 'jobs', {'id': j_id})
-                    #
+                    job['cov_ids'] = prev_ids
+                    job['cov_list'] = cov_list
+                    save_job(job, db, experiment_name)
+                    job = db.load(experiment_name, 'jobs', {'id': j_id})
                     process = elc_resource.attempt_dispatch(experiment_name,
                                                             job,
                                                             db_address,
@@ -559,10 +561,10 @@ def get_prev_input_covariances(chooser, options, db, curr_job):
     completed_inputs = [job['params'] for job in jobs if job['status'] == 'complete']
 
     curr_input = [curr_job['params']]
-    covs = chooser.get_cov(curr_input, completed_inputs, debug=False)
-    
-    print 'num_completed: {}, covs:{}'.format(len(completed_job_ids), covs)
-    
+    covs = [c for c in chooser.get_cov(curr_input, completed_inputs, debug=False)]
+
+    return completed_job_ids, covs
+
 # TODO: support decoupling i.e. task_names containing more than one task,
 #       and the chooser must choose between them in addition to choosing X
 def get_suggestion(chooser, task_names, db, expt_dir, options, resource_name):
@@ -635,7 +637,8 @@ def get_suggestion(chooser, task_names, db, expt_dir, options, resource_name):
         'elc_proc_id': None,
         'process': None,
         'elc_process': None,
-        'prev_jobs_cov': None,
+        'cov_ids': None,
+        'cov_list': None,
     }
 
     save_job(job, db, experiment_name)
