@@ -213,29 +213,14 @@ from spearmint.utils.database.mongodb import MongoDB
 
 from spearmint.utils.parsing import parse_db_address
 
-
-def get_options():
-    parser = optparse.OptionParser(usage="usage: %prog [options] directory")
-
-    parser.add_option("--config", dest="config_file",
-                      help="Configuration file name.",
-                      type="string", default="config.json")
-
-    (commandline_kwargs, args) = parser.parse_args()
-
-    # Read in the config file
-    expt_dir = os.path.realpath(os.path.expanduser(args[0]))
-    if not os.path.isdir(expt_dir):
-        raise Exception("Cannot find directory %s" % expt_dir)
-    expt_file = os.path.join(expt_dir, commandline_kwargs.config_file)
-
+def get_options_from_config(expt_file):
     try:
         with open(expt_file, 'r') as f:
             options = json.load(f, object_pairs_hook=OrderedDict)
     except:
         raise Exception("config.json did not load properly. \
             Perhaps a spurious comma?")
-    options["config"] = commandline_kwargs.config_file
+    options["config"] = expt_file
 
     # Set sensible defaults for options
     options['chooser'] = options.get('chooser', 'default_chooser')
@@ -252,10 +237,6 @@ def get_options():
     else:
         options['database']['address'] = db_address
 
-    if not os.path.exists(expt_dir):
-        sys.stderr.write("Cannot find experiment directory '%s'. "
-                         "Aborting.\n" % (expt_dir))
-        sys.exit(-1)
 
     # Set max number of iterations (a ridiculuous number for now
     if "max-finished-jobs" not in options:
@@ -268,24 +249,43 @@ def get_options():
         if "validation-check-time" not in options:
             options["validation-check-time"] = 5.0
 
+    return options
+    
+def get_options():
+    parser = optparse.OptionParser(usage="usage: %prog [options] directory")
+
+    parser.add_option("--config", dest="config_file",
+                      help="Configuration file name.",
+                      type="string", default="config.json")
+
+    (commandline_kwargs, args) = parser.parse_args()
+
+    # Read in the config file
+    expt_dir = os.path.realpath(os.path.expanduser(args[0]))
+    if not os.path.isdir(expt_dir):
+        raise Exception("Cannot find directory %s" % expt_dir)
+    expt_file = os.path.join(expt_dir, commandline_kwargs.config_file)
+    options = get_options_from_config(expt_file)
     return options, expt_dir
 
+def prepare(options):
+    resources = parse_resources_from_config(options)
+
+    chooser_module = importlib.import_module('spearmint.choosers.' +
+                                             options['chooser'])
+
+    experiment_name = options.get('experiment-name', 'unnamed-experiment')
+
+    db_address = options['database']['address']
+    db = MongoDB(database_address=db_address)
+    chooser = chooser_module.init(options)
+    return resources, chooser, experiment_name, db_address, db
 
 def main():
     options, expt_dir = get_options()
-
-    resources = parse_resources_from_config(options)
-
-    # Load up the chooser.
-    chooser_module = importlib.import_module('spearmint.choosers.' +
-                                             options['chooser'])
-    chooser = chooser_module.init(options)
-    experiment_name = options.get("experiment-name", 'unnamed-experiment')
-
-    # Connect to the database
-    db_address = options['database']['address']
+    resources, chooser, experiment_name, db_address, db = prepare(options)
+    
     sys.stderr.write('Using database at %s.\n' % db_address)
-    db = MongoDB(database_address=db_address)
     jobs = load_jobs(db, experiment_name)
     remove_broken_jobs(db, jobs, experiment_name, resources)
     if tired(db, experiment_name, resources):
@@ -745,7 +745,6 @@ def load_task_group(db, options, task_names=None):
 #             best_job_fh.write('%s: %s\n' % (name, params))
 
 #     best_job_fh.close()
-
 def clean_last_job(expt_dir,config_filename=None):
     if config_filename is None:
         config_filename='config.json'

@@ -190,7 +190,7 @@ import json
 from parsing import parse_db_address
 
 
-def cleanup(path, config_file='config.json'):
+def cleanup(path, config_file='config.json', expt_name=None):
 
     if not os.path.isdir(path):
         raise Exception("%s is not a valid directory" % path)
@@ -199,6 +199,9 @@ def cleanup(path, config_file='config.json'):
         cfg = json.load(f)
 
     db_address = parse_db_address(cfg)
+    if expt_name is not None:
+        cfg['experiment-name'] = expt_name
+
     print 'Cleaning up experiment %s in database at %s' % (cfg["experiment-name"], db_address)
 
     client = pymongo.MongoClient(db_address)
