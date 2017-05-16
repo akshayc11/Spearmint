@@ -55,6 +55,7 @@ Spearmint will output results to standard out / standard err. You can also load 
 To run the extrapolation of learning curve examples in the example folder (refer to mxnet-* folders):
 You will need [MXNET](https://www.mxnet.io)
 The current examples use mxnet with GPU.
+One dependency is to install requests (pip install requests)
 
 ***Note regarding MNIST and ELC
 The baseline method, which uses emcee is very slow compared to the actual training time required for each epoch in MNIST 
