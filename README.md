@@ -33,7 +33,7 @@ Spearmint implements a combination of the algorithms detailed in the following p
 **STEP 1: Installation**  
 
 1. Install [python](https://www.python.org/), [numpy](http://www.numpy.org/), [scipy](http://www.numpy.org/), [pymongo](https://api.mongodb.org/python/current/). For academic users, the [anaconda](http://continuum.io/downloads) distribution is great. Use numpy 1.8 or higher. We use python 2.7.
-2. Install psutil, emcee, triangle, for the learning curve predictions. branch
+2. Install psutil, emcee, triangle, weave using pip
 3. Download and install MongoDB: https://www.mongodb.org/   
 4. Install the pymongo package using e.g., pip `pip install pymongo` or anaconda `conda install pymongo`  
 5. Download/clone the spearmint code  
@@ -55,6 +55,7 @@ Spearmint will output results to standard out / standard err. You can also load 
 To run the extrapolation of learning curve examples in the example folder (refer to mxnet-* folders):
 You will need [MXNET](https://www.mxnet.io)
 The current examples use mxnet with GPU.
+One dependency is to install requests (pip install requests)
 
 ***Note regarding MNIST and ELC
 The baseline method, which uses emcee is very slow compared to the actual training time required for each epoch in MNIST 

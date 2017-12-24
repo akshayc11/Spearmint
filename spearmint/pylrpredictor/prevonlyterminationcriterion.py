@@ -44,8 +44,8 @@ class TerminationCriterion(object):
         self.prob_x_greater_type = prob_x_greater_type
         self.xlim = xlim
         self.y_prev_list = [y for y in y_prev_list if len(y) == xlim]
-        print y_curr
-        print [len(y) for y in y_prev_list]
+        # print y_curr
+        # print [len(y) for y in y_prev_list]
         self.a_b_losses = []
         self.predictive_std_threshold=predictive_std_threshold
         self.min_y_prev = min_y_prev
