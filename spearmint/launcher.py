@@ -193,7 +193,8 @@ from spearmint.utils.database.mongodb import MongoDB
 from spearmint.pylrpredictor.terminationcriterion import \
     ConservativeTerminationCriterion, OptimisticTerminationCriterion
 from spearmint.pylrpredictor.prevonlyterminationcriterion import ConservativeTerminationCriterion as GelcConservativeTerminationCriterion
-from spearmint.pylrpredictor.prevonlyhpterminationcriterion import ConservativeTerminationCriterion as GelcHpConservativeTerminationCriterion
+#from spearmint.pylrpredictor.prevonlyhpterminationcriterion import ConservativeTerminationCriterion as GelcHpConservativeTerminationCriterion
+from spearmint.pylrpredictor.prevhpterminationcriterion import ConservativeTerminationCriterion as GelcHpConservativeTerminationCriterion
 
 def main():
     parser = argparse.ArgumentParser(description="usage: %prog [options]")
