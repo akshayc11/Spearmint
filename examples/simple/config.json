@@ -4,8 +4,6 @@
     "experiment-name" : "simple-braninhoo-example",
     "likelihood"      : "NOISELESS",
     "polling-time"    : 1,
-    "validation-check": true,
-    "validation-check-time": 1,
     "variables" : {
         "x" : {
             "type" : "FLOAT",
