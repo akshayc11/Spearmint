@@ -148,7 +148,7 @@ if __name__ == '__main__':
         lr_step_epochs = '200,250',
     )
     args = parser.parse_args()
-    
+    print args
     sym = make_network(**vars(args))
 
     # train

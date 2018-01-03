@@ -11,7 +11,14 @@ from gradient_descent import gradient_descent
 IMPROVEMENT_PROB_THRESHOLD = 0.05
 PREDICTIVE_STD_THRESHOLD = 0.005
 
-
+def get_inter_param_dist(p1, p2):
+    assert len(p1) == len(p2)
+    dist = 0.0
+    for i in range(len(p1)):
+        px = p1[i]
+        py = p2[i]
+        assert type(px) == type(py)
+        
 
 
 class TerminationCriterion(object):
@@ -48,9 +55,9 @@ class TerminationCriterion(object):
         y_p = [(y_cov_list[i],y) for i,y in enumerate(y_prev_list) if len(y) == xlim]
 
         y_p = sorted(y_p, lambda x : x[0])
-        self.y_cov_list = [x[0] for x in y_p]
+        self.y_cov_list = [x[0] for x in y_p][0:min_y_prev]
         
-        self.y_prev_list = [x[1] for x in y_p]
+        self.y_prev_list = [x[1] for x in y_p][0:min_y_prev]
 
         #self.y_prev_list = [y for y in y_prev_list if len(y) == xlim]
         
@@ -156,7 +163,7 @@ class TerminationCriterion(object):
         for i in xrange(int(2*n)):
             a_b_loss = gradient_descent(f_c, f_p, return_loss=True,
                                         recency_weighting=self.recency_weighting,
-                                        lambda_hp=1.0, f_p_cov=y_cov)
+                                        lambda_hp=1.0, f_p_cov=None)
             if self.monotonicity_condition is True:
                 a,b,loss = a_b_loss
                 f_c_pred_fin = a * f_ps[-1] + b

@@ -154,7 +154,7 @@ def fit(args, network, data_loader, **kwargs):
     # devices for training
     devs = mx.cpu() if args.gpus is None or args.gpus is '' else [
         mx.gpu(int(i)) for i in args.gpus.split(',')]
-
+    print("Device:", devs)
     # learning rate
     lr, lr_scheduler = _get_lr_scheduler(args, kv)
 

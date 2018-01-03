@@ -1,13 +1,14 @@
 import subprocess
 import os
 import numpy as np
+
 num_neurons = [32*x for x in range(1,101)]
 lr_factors = [x * 0.1 for x in range(5,10)]
 max_epochs = 300
 lr_step_epochs = [','.join([str(step_size + step_size*x) for x in range(max_epochs/step_size - 1)]) for step_size in [30, 60, 90, 120, 150]]
 lr_step_epochs.append('200,250')
 
-train_cmd ='python train_cifar10_custom.py --gpus 1 --units {} --filter-list {} --lr {} --lr-factor {} --lr-step-epoch {} --kill-time 0'
+train_cmd ='python train_cifar10_custom.py --gpus 0 --units {} --filter-list {} --lr {} --lr-factor {} --lr-step-epoch {}'
 out_dir='log'
 # mxnet_dir='/data-local2/akshayc/Workspace/Software/mxnet/example/image-classification'
 
@@ -67,3 +68,37 @@ def get_validation_accuracies(job_id, params):
     print 'v_accs size:', len(v_accs)
     n = int(len(v_accs)/10)*10
     return np.array(v_accs[0:n])
+
+if __name__ == '__main__':
+    import random
+    import sys
+    per_unit = random.randint(1, 5) #int(params['per_unit'])
+    num_segments = random.randint(1, 4) # int(params['num_segments'])
+    lr = random.uniform(0.01, 0.1) # float(params['lr'])
+    lr_factor_idx = random.randint(0, 4) 
+    lr_factor = lr_factors[lr_factor_idx] # lr_factors[int(params['lr_factor_idx'])]
+    lr_step_epoch_idx = random.randint(0, 5)
+    lr_step_epoch = lr_step_epochs[lr_step_epoch_idx] # lr_step_epochs[int(params['lr_step_epoch_idx'])]
+    units = [per_unit for j in range(num_segments)]
+    filter_list = [16*(2**j) for j in range(num_segments+1)]
+
+    parameters='num_segments:{} units:{} filter_list:{} lr:{} lr_factor:{} lr_step_epoch:{}'.format(num_segments, units, filter_list, lr, lr_factor, lr_step_epoch)
+    print parameters
+    for iter in range(1):
+        of_name = 'pu{}_ns{}_lr{}_lf{}_ls{}_it{}.log'.format(
+            per_unit,
+            num_segments,
+            lr,
+            lr_factor_idx,
+            lr_step_epoch_idx,
+            iter
+        )
+        
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+    
+        
+        out_file_name='{}/{}'.format(out_dir, of_name)
+        run(units, filter_list, lr, lr_factor, lr_step_epoch, out_file_name, parameters)
+        best_acc = get_best_validation_accuracy(out_file_name)
+    
