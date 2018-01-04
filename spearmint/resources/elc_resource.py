@@ -91,6 +91,10 @@ def parse_elc_config(elc_resource_config=None):
     if 'monotonicity-condition' not in elc_resource_config:
         elc_resource_config['monotonicity-condition'] = False
 
+    if 'selection' not in elc_resource_config:
+        elc_resource_config['selection'] = 'covariance'
+
+    
     return elc_resource_config
 
 

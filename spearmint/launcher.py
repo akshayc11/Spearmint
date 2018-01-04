@@ -256,6 +256,10 @@ def main():
                         type=bool,
                         default=False,
                         help='Flag to enforce that final value should not be lesser than best seen so far')
+    parser.add_argument('--selection',
+                        type=str,
+                        default='covariance',
+                        help='Selection of curves: either covariance or random')
     options = parser.parse_args()
 
     launch(options)
@@ -279,7 +283,8 @@ def launch(options):
     min_y_prev = options.min_y_prev
     recency_weighting = options.recency_weighting
     monotonicity_condition = options.monotonicity_condition
-
+    selection = options.selection
+    
     db = MongoDB(database_address=db_address)
     job = db.load(experiment_name, 'jobs', {'id': job_id})
     prev_jobs = db.load(experiment_name, 'jobs', {'status': 'complete'})
@@ -566,15 +571,17 @@ def python_validation_accs(job):
 
 def python_elc(job, mode, prob_x_greater_type, threshold,
                predictive_std_threshold, nthreads, xlim, prev_jobs = [], min_y_prev=1,
-               recency_weighting=False, monotonicity_condition=False, task=None):
+               recency_weighting=False, monotonicity_condition=False, task=None, selection="covariance"):
     if task is None:
         task = job['tasks'][0]
     y_list = np.array(job['validation_accs'][task])
     y_best = job['y_best']
     y_prev_ids =[j['id'] for j in prev_jobs]
+    print y_prev_ids
     y_prev_list = [np.array(j['validation_accs'][task]) for j in prev_jobs]
     y_covs_list = job['cov_list']
     y_cov_ids = job['cov_ids']
+    print y_covs_list
     y_cov_list = [y_covs_list[y_cov_ids.index(jid)] for jid in y_prev_ids]
     if mode == 'conservative':
         term_crit = ConservativeTerminationCriterion(
@@ -602,7 +609,8 @@ def python_elc(job, mode, prob_x_greater_type, threshold,
             min_y_prev=min_y_prev,
             recency_weighting=recency_weighting,
             monotonicity_condition=monotonicity_condition,
-            y_cov_list=y_cov_list)
+            y_cov_list=y_cov_list,
+            selection=selection)
     else:
         raise Exception("Invalid mode for ELC: {}".format(mode))
     result = term_crit.run(y_best, threshold=threshold)

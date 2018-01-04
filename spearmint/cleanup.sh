@@ -185,20 +185,31 @@
 #! /bin/bash
 # This is a simple script to cleanup the intermediate files in 
 # spearmint experiment directories
-[[ -n "$1" ]] || { echo "Usage: ./cleanup.sh <experiment_dir> [<config-file>] [<output-dir>]"; exit 0 ; }
-if [ -d $1 ]
+only_pending=""
+config_file=
+op_dir=output
+. parse_options.sh
+
+
+if [ $# -ne 1 ]; then
+    echo "Usage: ./cleanup.sh [options] <experiment_dir>";
+    echo "Check the section above for options. e.g. only_pending can be specified by --only-pending"
+    exit 1;
+fi
+echo "Only Pending: $only_pending"
+output_dir=$1
+op_dir=${output_dir}/${op_dir}
+if [ -d $output_dir ]
 then
-    if [ -f $1/$2 ]; then 
-	python -c "import spearmint.utils.cleanup as cleanup; import sys; cleanup.cleanup(sys.argv[1], config_file=sys.argv[2])" $1 $2
+    if [ -f ${output_dir}/${config_file} ]; then
+	python -c "import spearmint.utils.cleanup as cleanup; import sys; cleanup.cleanup(sys.argv[1], config_file=sys.argv[2],only_pending=bool(sys.argv[3]))" ${output_dir} ${config_file} "${only_pending}"
     else
-	python -c "import spearmint.utils.cleanup as cleanup; import sys; cleanup.cleanup(sys.argv[1])" $1
+	python -c "import spearmint.utils.cleanup as cleanup; import sys; cleanup.cleanup(sys.argv[1], only_pending=bool(sys.argv[2]))" ${output_dir} "${only_pending}"
     fi
-    cd $1
 else
-    echo "$1 is not a valid directory"
+    echo "$output_dir is not a valid directory"
     exit 0;
 fi
-
-opdir=output/$3
-
-rm ${opdir}/*
+if [ "${only_pending}" = "" ]; then
+    rm ${op_dir}/*
+fi

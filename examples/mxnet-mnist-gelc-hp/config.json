@@ -1,0 +1,58 @@
+{
+    "language": "PYTHON",
+    "main-file": "run_mxnet_mnist",
+    "experiment-name": "mxnet-mnist-with-gelc-hp",
+    "polling-time": 5,
+    "resources": {
+	"my-machine": {
+	    "scheduler": "local",
+	    "max-concurrent": 1,
+	    "max-finished-jobs": 100
+	}
+    },
+    "validation-check": true,
+    "validation-check-time": 5.0,
+    "elc_resource": {
+	"mode": "gelc-hp-conservative",
+	"prob_x_greater_type": "posterior_prob_x_greater_than",
+	"threshold": 0.05,
+	"predictive_std_threshold": 0.005,
+	"xlim": 20,
+	"nthreads": 4,
+	"min_y_prev": 5,
+	"recency-weighting": true,
+	"monotonicity-condition": true
+    },
+    "variables": {
+	"num_hidden_layers": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 1,
+	    "max": 8
+	},
+	"num_neurons": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 1,
+	    "max": 100
+	},
+	"lr": {
+	    "type": "FLOAT",
+	    "size": 1,
+	    "min": 0.001,
+	    "max": 0.1
+	},
+	"lr_factor_idx": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 4
+	},
+	"lr_step_epoch_idx": {
+	    "type": "INT",
+	    "size": 1,
+	    "min": 0,
+	    "max": 2
+	}
+    }
+}

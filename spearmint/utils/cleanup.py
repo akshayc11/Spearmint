@@ -190,8 +190,8 @@ import json
 from parsing import parse_db_address
 
 
-def cleanup(path, config_file='config.json', expt_name=None):
-
+def cleanup(path, config_file='config.json', expt_name=None, only_pending=False):
+    print only_pending
     if not os.path.isdir(path):
         raise Exception("%s is not a valid directory" % path)
 
@@ -207,8 +207,11 @@ def cleanup(path, config_file='config.json', expt_name=None):
     client = pymongo.MongoClient(db_address)
 
     db = client.spearmint
-    db[cfg["experiment-name"]]['jobs'].drop()
-    db[cfg["experiment-name"]]['hypers'].drop()
+    if only_pending is False:
+        db[cfg["experiment-name"]]['jobs'].drop()
+        db[cfg["experiment-name"]]['hypers'].drop()
+    else:
+        db[cfg["experiment-name"]]['jobs'].delete_many({'status': 'pending'})
 
 if __name__ == '__main__':
     cleanup(sys.argv[1])

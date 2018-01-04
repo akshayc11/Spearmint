@@ -7,6 +7,7 @@ import numpy as np
 from pprint import pprint
 from scipy.stats import norm
 from gradient_descent import gradient_descent
+from random import shuffle
 
 IMPROVEMENT_PROB_THRESHOLD = 0.05
 PREDICTIVE_STD_THRESHOLD = 0.005
@@ -31,30 +32,37 @@ class TerminationCriterion(object):
     is less, with the restriction being relaxed as more samples get
     available.
     """
-    prob_x_greater_type = None
-    xlim = None
-    model = None
-    has_fit =  False
-    y_prev_list = None
-    y_curr = None
-    y_best = None
-    a_b_losses = None
-    min_y_prev = None
-    recency_weighting = None
-    monotonicity_condition = None
-    y_cov_list=None
+    # prob_x_greater_type = None
+    # xlim = None
+    # model = None
+    # has_fit =  False
+    # y_prev_list = None
+    # y_curr = None
+    # y_best = None
+    # a_b_losses = None
+    # min_y_prev = None
+    # recency_weighting = None
+    # monotonicity_condition = None
+    # y_cov_list=None
     def __init__(self, y_curr, xlim, prob_x_greater_type=None,
                  y_prev_list=[], n=100, predictive_std_threshold=PREDICTIVE_STD_THRESHOLD,
                  min_y_prev=1, recency_weighting=False, monotonicity_condition=True,
-                 y_cov_list=[], curr_hp = [], prev_hps = []):
+                 y_cov_list=[], curr_hp = [], prev_hps = [], selection='covariance'):
         """
         Constructor for the TerminationCriterion
         """
         self.prob_x_greater_type = prob_x_greater_type
         self.xlim = xlim
+        if len(y_cov_list) == 0:
+            y_cov_list = [1.0 for i in range(len(y_prev_list))] 
         y_p = [(y_cov_list[i],y) for i,y in enumerate(y_prev_list) if len(y) == xlim]
-
-        y_p = sorted(y_p, lambda x : x[0])
+        if selection == 'random':
+            shuffle(y_p)
+        elif selection == 'covariance':
+            y_p = sorted(y_p, key=lambda x : x[0])
+        else:
+            raise Exception('Unsupported selection type:{}'.format(selection))
+            
         self.y_cov_list = [x[0] for x in y_p][0:min_y_prev]
         
         self.y_prev_list = [x[1] for x in y_p][0:min_y_prev]
@@ -185,14 +193,16 @@ class ConservativeTerminationCriterion(TerminationCriterion):
                  min_y_prev=1,
                  recency_weighting=False,
                  monotonicity_condition=True,
-                 y_cov_list=[]):
+                 y_cov_list=[],
+                 selection='covariance'):
         super(ConservativeTerminationCriterion, self).__init__(
             y_curr, xlim, prob_x_greater_type,
             y_prev_list=y_prev_list, n=n, min_y_prev=min_y_prev,
             recency_weighting=recency_weighting,
             monotonicity_condition=monotonicity_condition,
             predictive_std_threshold=predictive_std_threshold,
-            y_cov_list=y_cov_list)
+            y_cov_list=y_cov_list,
+            selection=selection)
     
     def run(self, y_best, threshold=IMPROVEMENT_PROB_THRESHOLD):
         """
